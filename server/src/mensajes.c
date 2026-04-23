@@ -17,7 +17,7 @@ int readLine(int fd, char *buffer, size_t n) {
     buf = buffer;
     totRead = 0;
 
-    for (;;) { [cite: 4562]
+    for (;;) {
         numRead = read(fd, &ch, 1); // lee un byte
 
         if (numRead == -1) {
@@ -45,4 +45,17 @@ int readLine(int fd, char *buffer, size_t n) {
 
     *buf = '\0'; // finaliza la cadena correctamente
     return totRead; // devuelve el número de bytes leídos
+}
+
+int sendMessage(int socket, char *buffer, int len){
+    int r;
+    int l = len;
+    do { r = write(socket, buffer, l);
+        l = l – r;
+        buffer = buffer + r;
+    } while ((l>0) && (r>=0));
+    if (r < 0)
+        return (-1); /* fallo */
+    else 
+        return(0); /* se ha enviado longitud */
 }

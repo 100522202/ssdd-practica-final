@@ -15,6 +15,8 @@
 
 
 #define NUMBER_OF_PORTS 65535
+#define MSG_MAX_SIZE 256 // Como mucho 255 + '/0', establecido por el enunciado
+
 
 // Manejador de la señal sigint
 void handle_sigint(int sig) {
@@ -25,66 +27,54 @@ void handle_sigint(int sig) {
 
 // Función para procesar las peticiones de los hilos
 void *procesar_peticion(void* socket_especifico_fd){
+    // Variables locales
+
     // El padre reserva este entero para evitar carreras al pasar el fd al hilo.
     int fd_local = *(int*)socket_especifico_fd;
+
+    char instruccion[MSG_MAX_SIZE]; // buffer para las instrucciones
+    char buffer[MSG_MAX_SIZE]; // buffer para el texto que acompaña a las instrucciones
+    unsigned char resultado; // para devolver posteriormente el resultado de la operación
+
+
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
 
     // ---- Tratamiento de la petición ----
 
-    // Leer el cod_op
-    unsigned char codigo_operacion;
-    /*
-    AQUI IRÁ READLINE PORQUE ESTAMOS CON STRINGS
+    // Leer la instrucción a ejecutar
 
-    DIAP. 115 T4 cómo enviar una cadena
-
-
-    if (recvMessage(fd_local, &codigo_operacion, sizeof(codigo_operacion)) < 0){
+    if (readLine(fd_local, instruccion, MSG_MAX_SIZE) < 0){
         close(fd_local);
         pthread_exit(NULL);
     }
-    */
 
-    /*
-    // Procesar según qué operación sea
+    // Lectura exitosa: procesar según qué operación sea
 
-    switch (codigo_operacion) {
-    case OP_SET:
-        procesar_set(fd_local);
-        break;
+    if (strcmp(instruccion, "REGISTER") == 0){}
+    else if (strcmp(instruccion, "UNREGISTER") == 0){}
+    else if (strcmp(instruccion, "CONNECT") == 0){}
+    else if (strcmp(instruccion, "DISCONNECT") == 0){}
+    else if (strcmp(instruccion, "USERS") == 0){}
+    else if (strcmp(instruccion, "SEND") == 0){}
+    else if (strcmp(instruccion, "SENDATTACH") == 0){}
+    else if (strcmp(instruccion, "QUIT") == 0){}
+    else {
+        printf("Comando desconocido: %s\n", instruccion);
+        resultado = 2; // Error de comando
 
-    case OP_GET:
-        procesar_get(fd_local);
-        break;
+        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+            perror("Error enviando respuesta de error");
+        }
 
-    case OP_MODIFY:
-        procesar_modify(fd_local);
-        break;
-
-    case OP_DELETE:
-        procesar_delete(fd_local);
-        break;
-
-    case OP_EXIST:
-        procesar_exist(fd_local);
-        break;
-
-    case OP_DESTROY:
-        procesar_destroy(fd_local);
-        break;
-
-    default:
-    {
-        int32_t resultado_error = htonl(-1);
-        sendMessage(fd_local, &resultado_error, sizeof(resultado_error));
-        break;
+        close(fd_local);
+        pthread_exit(NULL);
     }
-    
-    }*/
+
     close(fd_local);
     pthread_exit(NULL);
 }
+
 
 int main(int argc, char * argv[]){
     

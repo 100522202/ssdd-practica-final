@@ -16,5 +16,6 @@
  * @return El número de caracteres leídos (incluyendo el '\0') o -1 en caso de error.
  */
 int readLine(int fd, char *buffer, size_t n);
+int sendMessage(int socket, char *buffer, int len);
 
 #endif
