@@ -37,6 +37,9 @@ void *procesar_peticion(void* socket_especifico_fd){
     /*
     AQUI IRÁ READLINE PORQUE ESTAMOS CON STRINGS
 
+    DIAP. 115 T4 cómo enviar una cadena
+
+
     if (recvMessage(fd_local, &codigo_operacion, sizeof(codigo_operacion)) < 0){
         close(fd_local);
         pthread_exit(NULL);
