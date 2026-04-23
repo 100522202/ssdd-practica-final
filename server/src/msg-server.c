@@ -51,7 +51,16 @@ void *procesar_peticion(void* socket_especifico_fd){
 
     // Lectura exitosa: procesar según qué operación sea
 
-    if (strcmp(instruccion, "REGISTER") == 0){}
+    if (strcmp(instruccion, "REGISTER") == 0){
+        // Leer el nombre de usuario a registrar
+        if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
+            printf("REGISTER: Error leyendo el nombre de usuario\n");
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        // TODO: creo que implementar la lógica de registro se haría en el servidor de registro, con RPCs. Aunque seguramente lo hagamos completo, ¿cómo podríamos probar ahora las operaciones?
+    }
     else if (strcmp(instruccion, "UNREGISTER") == 0){}
     else if (strcmp(instruccion, "CONNECT") == 0){}
     else if (strcmp(instruccion, "DISCONNECT") == 0){}
