@@ -9,10 +9,11 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <pthread.h>
-#include "claves.h"
-#include "mensajes.h"
-#include "procesar_funcion.h"
+#include <signal.h>
+#include <netdb.h>
 
+
+#include "mensajes.h"
 
 #define NUMBER_OF_PORTS 65535
 #define MSG_MAX_SIZE 256 // Como mucho 255 + '/0', establecido por el enunciado
@@ -182,6 +183,7 @@ int main(int argc, char * argv[]){
             
             // Si se llega hasta aquí es que el servidor está escuchando
             printf("s> init server %s:%ld\n", inet_ntoa(in), puerto);
+            printf("s>\n");
         }
     }
 

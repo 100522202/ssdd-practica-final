@@ -192,6 +192,10 @@ class client :
             parser.error("Error: Port must be in the range 1024 <= port <= 65535");
             return False;
         
+        # TODO: CREO que sería así:
+        # client._server = args.s
+        # client._port = args.p
+
         _server = args.s
         _port = args.p
 
