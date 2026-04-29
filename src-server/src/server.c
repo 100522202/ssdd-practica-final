@@ -18,6 +18,7 @@
 #define NUMBER_OF_PORTS 65535
 #define MSG_MAX_SIZE 256 // Como mucho 255 + '/0', establecido por el enunciado
 
+static pthread_mutex_t mutex_usuarios = PTHREAD_MUTEX_INITIALIZER;
 
 // Manejador de la señal sigint
 void handle_sigint(int sig) {
@@ -53,6 +54,7 @@ void *procesar_peticion(void* socket_especifico_fd){
     // Lectura exitosa: procesar según qué operación sea
 
     if (strcmp(instruccion, "REGISTER") == 0){
+
         // Leer el nombre de usuario a registrar
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
             printf("REGISTER: Error leyendo el nombre de usuario\n");
@@ -60,7 +62,13 @@ void *procesar_peticion(void* socket_especifico_fd){
             pthread_exit(NULL);
         }
 
-        // TODO: creo que implementar la lógica de registro se haría en el servidor de registro, con RPCs. Aunque seguramente lo hagamos completo, ¿cómo podríamos probar ahora las operaciones?
+        // Bloqueamos por si hay varios clientes entrando al mismo tiempo
+        pthread_mutex_lock(&mutex_usuarios);
+
+        // Verificar que no existe otro usuario registrado con el mismo nombre: find_user
+
+        // Liberamos el mutex al terminar
+        pthread_mutex_unlock(&mutex_usuarios);
     }
     else if (strcmp(instruccion, "UNREGISTER") == 0){}
     else if (strcmp(instruccion, "CONNECT") == 0){}
