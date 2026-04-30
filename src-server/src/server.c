@@ -65,8 +65,7 @@ void *procesar_peticion(void* socket_especifico_fd){
 
         // Leer el nombre de usuario a registrar
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
-            // TODO: si es mayor que 256 simplemente lee hasta 256, es eso lo esperado o deberia lanzar error?
-            // si ponemos en c> REGISTER *espacio* se registra, ¿debe ser así?
+            // TODO: si es mayor que 256 simplemente lee hasta 256, es eso lo esperado o deberia lanzar error? lanzar error comparando con strlen el buffer
             printf("REGISTER: Error leyendo el nombre de usuario\n");
             close(fd_local);
             pthread_exit(NULL);

@@ -106,7 +106,7 @@ class client :
                 print("c> UNREGISTER FAIL")
                 return client.RC.ERROR
                 
-            code = int.from_bytes(res, byteorder='little') # TODO: little o big????
+            code = int.from_bytes(res, byteorder='little')
             
             if code == 0:
                 print("c> UNREGISTER OK")
@@ -284,10 +284,6 @@ class client :
         
         client._server = args.s
         client._port = args.p
-
-        # TODO: Invisibles dicen que esto son vars locales y creo que sí porque me pone unused
-        # _server = args.s
-        # _port = args.p
 
         return True
 
