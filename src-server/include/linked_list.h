@@ -44,11 +44,11 @@ typedef struct user_node {
 } user_node_t;
 
 
-/* --- Prototipos de funciones para gestionar la lista (a implementar en el .c) --- */
+/* --- Prototipos de funciones para gestionar la lista --- */
 
-// user_node_t* add_user(user_node_t **head, const char *userName);
-// int remove_user(user_node_t **head, const char *userName);
-// user_node_t* find_user(user_node_t *head, const char *userName);
+user_node_t* add_user(user_node_t **head, const char *userName); // const char porque solo leeremos, no modificaremos userName
+int remove_user(user_node_t **head, const char *userName);
+user_node_t* find_user(user_node_t *head, const char *userName);
 
 // void add_pending_message(user_node_t *dest_user, const char *sender, unsigned int id, const char *text);
 // void free_pending_messages(mensaje_pendiente_t *head);

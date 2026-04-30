@@ -14,16 +14,22 @@
 
 
 #include "mensajes.h"
+#include "linked_list.h"
 
 #define NUMBER_OF_PORTS 65535
 #define MSG_MAX_SIZE 256 // Como mucho 255 + '/0', establecido por el enunciado
 
+// Mutex que protege la lista enlazada con los usuarios
 static pthread_mutex_t mutex_usuarios = PTHREAD_MUTEX_INITIALIZER;
+
+// Definimos head, puntero que apuntará al primer elemento de la lista de usuarios
+static user_node_t *head = NULL; // inicialmente lista vacía
 
 // Manejador de la señal sigint
 void handle_sigint(int sig) {
     // Cerrar descriptores y liberar memoria 
     printf("\ns> Servidor terminado por señal %d\n", sig);
+    // TODO: En un futuro, iterar sobre 'head' y hacer free() de los nodos, podemos meter función auxiliar en linked_list que lo haga
     exit(0);
 }
 
@@ -37,6 +43,7 @@ void *procesar_peticion(void* socket_especifico_fd){
     char instruccion[MSG_MAX_SIZE]; // buffer para las instrucciones
     char buffer[MSG_MAX_SIZE]; // buffer para el texto que acompaña a las instrucciones
     unsigned char resultado; // para devolver posteriormente el resultado de la operación
+    user_node_t *user_actual = NULL; // donde almacenaremos el usuario en las operaciones
 
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
@@ -66,9 +73,24 @@ void *procesar_peticion(void* socket_especifico_fd){
         pthread_mutex_lock(&mutex_usuarios);
 
         // Verificar que no existe otro usuario registrado con el mismo nombre: find_user
+        usuario_actual = find_user(head, buffer);
+
+        if (usuario_actual != NULL){
+            resultado = 1; // Ya existe el usuario
+        } else {
+            // El usuario no existe: lo añadimos
+            add_user(&head, buffer);
+            resultado = 0; // éxito
+            printf("s> REGISTER %s OK\n", buffer); // Mensaje de log
+        }
 
         // Liberamos el mutex al terminar
         pthread_mutex_unlock(&mutex_usuarios);
+
+        // Enviar el resultado
+        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+            perror("Error enviando respuesta");
+        }
     }
     else if (strcmp(instruccion, "UNREGISTER") == 0){}
     else if (strcmp(instruccion, "CONNECT") == 0){}
