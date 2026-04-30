@@ -29,7 +29,8 @@ static user_node_t *head = NULL; // inicialmente lista vacía
 void handle_sigint(int sig) {
     // Cerrar descriptores y liberar memoria 
     printf("\ns> Servidor terminado por señal %d\n", sig);
-    // TODO: En un futuro, iterar sobre 'head' y hacer free() de los nodos, podemos meter función auxiliar en linked_list que lo haga
+    // TODO: En un futuro, iterar sobre 'head' y hacer free() de los nodos, podemos meter función auxiliar en linked_list que lo haga. 
+    // A no ser que la memoria deba permanecer entre ejecuciones que no lo creo
     exit(0);
 }
 
@@ -64,6 +65,8 @@ void *procesar_peticion(void* socket_especifico_fd){
 
         // Leer el nombre de usuario a registrar
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
+            // TODO: si es mayor que 256 simplemente lee hasta 256, es eso lo esperado o deberia lanzar error?
+            // si ponemos en c> REGISTER *espacio* se registra, ¿debe ser así?
             printf("REGISTER: Error leyendo el nombre de usuario\n");
             close(fd_local);
             pthread_exit(NULL);
@@ -72,7 +75,7 @@ void *procesar_peticion(void* socket_especifico_fd){
         // Bloqueamos por si hay varios clientes entrando al mismo tiempo
         pthread_mutex_lock(&mutex_usuarios);
 
-        // Verificar que no existe otro usuario registrado con el mismo nombre: find_user
+        // Verificar que existe otro usuario registrado con el mismo nombre: find_user
         usuario_actual = find_user(head, buffer);
 
         if (usuario_actual != NULL){
@@ -91,8 +94,40 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta");
         }
+    } else if (strcmp(instruccion, "UNREGISTER") == 0){
+        
+        // Leer el nombre del usuario a borrar
+        if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
+            printf("UNREGISTER: Error leyendo el nombre de usuario\n");
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        // Bloqueamos por si hay varios clientes entrando al mismo tiempo
+        pthread_mutex_lock(&mutex_usuarios);
+
+        // Verificar que existe otro usuario registrado con el mismo nombre: find_user
+        usuario_actual = find_user(head, buffer);
+
+        if (usuario_actual != NULL){
+            // Ya existe el usuario: lo borramos
+            remove_user(&head, buffer);
+            resultado = 0;
+            printf("s> UNREGISTER %s OK\n", buffer); // Mensaje de log
+        } else {
+            // El usuario no existe: error
+            printf("s> UNREGISTER %s FAIL\n", buffer); // Mensaje de log
+            resultado = 1; // fracaso
+        }
+
+        // Liberamos el mutex al terminar
+        pthread_mutex_unlock(&mutex_usuarios);
+
+        // Enviar el resultado
+        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+            perror("Error enviando respuesta");
+        }
     }
-    else if (strcmp(instruccion, "UNREGISTER") == 0){}
     else if (strcmp(instruccion, "CONNECT") == 0){}
     else if (strcmp(instruccion, "DISCONNECT") == 0){}
     else if (strcmp(instruccion, "USERS") == 0){}
@@ -119,6 +154,13 @@ void *procesar_peticion(void* socket_especifico_fd){
 int main(int argc, char * argv[]){
     
     if (argc != 3){
+        printf("Uso: ./server  -p <port>\n");
+        return -1;
+    }
+
+    // Validar flag -p
+
+    if (strcmp(argv[1], "-p") != 0){
         printf("Uso: ./server  -p <port>\n");
         return -1;
     }

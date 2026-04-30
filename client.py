@@ -80,8 +80,52 @@ class client :
     # 	 * @return ERROR if another error occurred
     @staticmethod
     def  unregister(user) :
-        #  Write your code here
-        return client.RC.ERROR
+                
+        # Creación del socket TCP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+        # Definición explícita de la tupla de dirección
+        server_address = (client._server, client._port)
+        
+        try:
+            # Conexión al servidor
+            sock.connect(server_address)
+            
+            # Envío de la instrucción REGISTER
+            op = "UNREGISTER\0"
+            sock.sendall(op.encode('utf-8'))
+            
+            # Envío del nombre de usuario
+            uname = user + "\0"
+            sock.sendall(uname.encode('utf-8'))
+            
+            # Lectura del byte de respuesta
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> UNREGISTER FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little') # TODO: little o big????
+            
+            if code == 0:
+                print("c> UNREGISTER OK")
+                return client.RC.OK
+            elif code == 1:
+                print("c> USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNREGISTER FAIL")
+                return client.RC.ERROR
+                
+        except socket.error as msg:
+            # Captura de errores específicos de socket
+            print("c> UNREGISTER FAIL")
+            return client.RC.ERROR
+            
+        finally:
+            # Cierre garantizado de la conexión
+            sock.close()
 
 
     # *

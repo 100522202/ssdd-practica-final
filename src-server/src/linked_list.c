@@ -45,7 +45,7 @@ int remove_user(user_node_t **head, const char *userName) {
     user_node_t *current = *head;
     user_node_t *previous = NULL;
 
-    // 1. Buscar el nodo que queremos borrar
+    // Buscar el nodo que queremos borrar
     while (current != NULL && strcmp(current->userName, userName) != 0) {
         previous = current;
         current = current->next;
