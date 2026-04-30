@@ -1,5 +1,6 @@
 from enum import Enum
 import argparse
+import socket
 
 class client :
 
@@ -23,9 +24,53 @@ class client :
     # * @return USER_ERROR if the user is already registered
     # * @return ERROR if another error occurred
     @staticmethod
-    def  register(user) :
-        #  Write your code here
-        return client.RC.ERROR
+    def register(user):
+        
+        # Creación del socket TCP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+        # Definición explícita de la tupla de dirección
+        server_address = (client._server, client._port)
+        
+        try:
+            # Conexión al servidor
+            sock.connect(server_address)
+            
+            # Envío de la instrucción REGISTER
+            op = "REGISTER\0"
+            sock.sendall(op.encode('utf-8'))
+            
+            # Envío del nombre de usuario
+            uname = user + "\0"
+            sock.sendall(uname.encode('utf-8'))
+            
+            # Lectura del byte de respuesta
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> REGISTER FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little')
+            
+            if code == 0:
+                print("c> REGISTER OK")
+                return client.RC.OK
+            elif code == 1:
+                print("c> USERNAME IN USE")
+                return client.RC.USER_ERROR
+            else:
+                print("c> REGISTER FAIL")
+                return client.RC.ERROR
+                
+        except socket.error as msg:
+            # Captura de errores específicos de socket
+            print("c> REGISTER FAIL")
+            return client.RC.ERROR
+            
+        finally:
+            # Cierre garantizado de la conexión
+            sock.close()
 
     # *
     # 	 * @param user - User name to unregister from the system
@@ -192,12 +237,13 @@ class client :
             parser.error("Error: Port must be in the range 1024 <= port <= 65535");
             return False;
         
-        # TODO: CREO que sería así:
-        # client._server = args.s
-        # client._port = args.p
+        
+        client._server = args.s
+        client._port = args.p
 
-        _server = args.s
-        _port = args.p
+        # TODO: Invisibles dicen que esto son vars locales y creo que sí porque me pone unused
+        # _server = args.s
+        # _port = args.p
 
         return True
 

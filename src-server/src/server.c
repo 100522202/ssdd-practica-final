@@ -43,7 +43,7 @@ void *procesar_peticion(void* socket_especifico_fd){
     char instruccion[MSG_MAX_SIZE]; // buffer para las instrucciones
     char buffer[MSG_MAX_SIZE]; // buffer para el texto que acompaña a las instrucciones
     unsigned char resultado; // para devolver posteriormente el resultado de la operación
-    user_node_t *user_actual = NULL; // donde almacenaremos el usuario en las operaciones
+    user_node_t *usuario_actual = NULL; // donde almacenaremos el usuario en las operaciones
 
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.

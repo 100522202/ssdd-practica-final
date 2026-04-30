@@ -10,9 +10,9 @@
 
 
 /* PARTE 2
-/* Estructura para los mensajes pendientes de entrega.
+ * Estructura para los mensajes pendientes de entrega.
  * Se enlazan para formar una cola por cada usuario.
- 
+ */
 typedef struct pending_message {
     unsigned int id;              // Identificador numérico del mensaje
     char remitente[MAX_STR_LEN];  // Nombre del usuario que envía el mensaje
@@ -21,7 +21,7 @@ typedef struct pending_message {
     
     struct pending_message *next; // Puntero al siguiente mensaje pendiente
 } mensaje_pendiente_t;
-*/
+
 
 
 
@@ -38,7 +38,7 @@ typedef struct user_node {
     unsigned int ultimo_id_msg;   
     
     // PARTE 2: Lista de mensajes almacenados esperando a que este usuario se conecte
-    // mensaje_pendiente_t *mensajes; 
+    mensaje_pendiente_t *mensajes; 
 
     struct user_node *next;       // Puntero al siguiente usuario en el sistema
 } user_node_t;

@@ -10,7 +10,7 @@ BUILDDIR = build
 ROOTDIR = ..
 
 # Archivos objeto
-OBJS = $(BUILDDIR)/mensajes.o $(BUILDDIR)/server.o
+OBJS = $(BUILDDIR)/mensajes.o $(BUILDDIR)/linked_list.o $(BUILDDIR)/server.o
 
 # Ejecutable en la raíz
 TARGET = $(ROOTDIR)/server
@@ -26,8 +26,12 @@ $(BUILDDIR):
 $(BUILDDIR)/mensajes.o: $(SRCDIR)/mensajes.c $(INCDIR)/mensajes.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Compilar linked_list.c
+$(BUILDDIR)/linked_list.o: $(SRCDIR)/linked_list.c $(INCDIR)/linked_list.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # Compilar server.c
-$(BUILDDIR)/server.o: $(SRCDIR)/server.c $(INCDIR)/mensajes.h
+$(BUILDDIR)/server.o: $(SRCDIR)/server.c $(INCDIR)/mensajes.h $(INCDIR)/linked_list.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Enlazar ejecutable en la raíz
