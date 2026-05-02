@@ -179,12 +179,10 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (usuario_actual == NULL) {
             resultado = 1; // El usuario no existe
             printf("s> CONNECT %s FAIL\n", buffer);
-        } 
-        else if (usuario_actual->estado == ESTADO_CONECTADO) {
+        } else if (usuario_actual->estado == ESTADO_CONECTADO) {
             resultado = 2; // El usuario ya está conectado
             printf("s> CONNECT %s FAIL\n", buffer);
-        } 
-        else {
+        } else {
             // Usuario existe y está desconectado: actualizamos datos y conectamos
             strncpy(usuario_actual->ip, ip_cliente, INET_ADDRSTRLEN);
             strncpy(usuario_actual->puerto, puerto_cliente, 16);
@@ -204,13 +202,16 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta de CONNECT");
         }
+
     } else if (strcmp(instruccion, "DISCONNECT") == 0){
 
         // Leer el nombre de usuario
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
             resultado = 3;
             printf("s> DISCONNECT FAIL\n");
-            sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char));
+            if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+                perror("Error enviando respuesta de CONNECT");
+            }
             close(fd_local);
             pthread_exit(NULL);
         }
@@ -223,12 +224,10 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (usuario_actual == NULL) {
             resultado = 1; // El usuario no existe
             printf("s> DISCONNECT %s FAIL\n", buffer);
-        } 
-        else if (usuario_actual->estado == ESTADO_DESCONECTADO) {
+        } else if (usuario_actual->estado == ESTADO_DESCONECTADO) {
             resultado = 2; // El usuario no estaba conectado
             printf("s> DISCONNECT %s FAIL\n", buffer);
-        } 
-        else {
+        } else {
             // Usuario existe y estaba conectado: limpiar datos y desconectar
             memset(usuario_actual->ip, 0, INET_ADDRSTRLEN);
             memset(usuario_actual->puerto, 0, 16);
@@ -244,7 +243,7 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta de DISCONNECT");
         }
-        
+
     } else if (strcmp(instruccion, "USERS") == 0){}
     else if (strcmp(instruccion, "SEND") == 0){}
     else if (strcmp(instruccion, "SENDATTACH") == 0){}
