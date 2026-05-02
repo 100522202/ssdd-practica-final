@@ -135,8 +135,7 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta");
         }
-    }
-    else if (strcmp(instruccion, "CONNECT") == 0){
+    } else if (strcmp(instruccion, "CONNECT") == 0){
 
         // Leer el nombre de usuario
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
@@ -205,9 +204,48 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta de CONNECT");
         }
-    }
-    else if (strcmp(instruccion, "DISCONNECT") == 0){}
-    else if (strcmp(instruccion, "USERS") == 0){}
+    } else if (strcmp(instruccion, "DISCONNECT") == 0){
+
+        // Leer el nombre de usuario
+        if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
+            resultado = 3;
+            printf("s> DISCONNECT FAIL\n");
+            sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char));
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        // Desconectar al usuario
+        pthread_mutex_lock(&mutex_usuarios);
+        
+        usuario_actual = find_user(head, buffer);
+
+        if (usuario_actual == NULL) {
+            resultado = 1; // El usuario no existe
+            printf("s> DISCONNECT %s FAIL\n", buffer);
+        } 
+        else if (usuario_actual->estado == ESTADO_DESCONECTADO) {
+            resultado = 2; // El usuario no estaba conectado
+            printf("s> DISCONNECT %s FAIL\n", buffer);
+        } 
+        else {
+            // Usuario existe y estaba conectado: limpiar datos y desconectar
+            memset(usuario_actual->ip, 0, INET_ADDRSTRLEN);
+            memset(usuario_actual->puerto, 0, 16);
+            usuario_actual->estado = ESTADO_DESCONECTADO;
+            
+            resultado = 0; // Éxito
+            printf("s> DISCONNECT %s OK\n", buffer);
+        }
+
+        pthread_mutex_unlock(&mutex_usuarios);
+
+        // Enviar el código de respuesta al cliente
+        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+            perror("Error enviando respuesta de DISCONNECT");
+        }
+        
+    } else if (strcmp(instruccion, "USERS") == 0){}
     else if (strcmp(instruccion, "SEND") == 0){}
     else if (strcmp(instruccion, "SENDATTACH") == 0){}
     else if (strcmp(instruccion, "QUIT") == 0){}
