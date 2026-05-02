@@ -136,8 +136,58 @@ class client :
     # * @return ERROR if another error occurred
     @staticmethod
     def  connect(user) :
-        #  Write your code here
-        return client.RC.ERROR
+        # Crear socket TCP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (client._server, client._port)
+        
+        try:
+            # Obtener un puerto libre del sistema
+
+            # Crear un socket temporal para reservar el puerto
+            temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            temp_sock.bind(('', 0))  # El puerto 0 indica al SO que asigne uno libre
+            puerto_asignado = temp_sock.getsockname()[1]
+            temp_sock.close()
+
+
+            sock.connect(server_address)
+            
+            # Enviar operación CONNECT
+            sock.sendall("CONNECT\0".encode('utf-8'))
+            
+            # Enviar nombre de usuario
+            sock.sendall(f"{user}\0".encode('utf-8'))
+            
+            # Enviar puerto de escucha del cliente (como string + \0)
+            # (Es un puerto asignado dinámicamente)
+            puerto_escucha = f"{puerto_asignado}\0"
+            sock.sendall(puerto_escucha.encode('utf-8'))
+            
+            # Recibir el byte de estado
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> CONNECT FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little')
+            
+            if code == 0:
+                print("c> CONNECT OK")
+                return client.RC.OK
+            elif code == 1 or code == 2:
+                # 1: no existe, 2: ya conectado -> es USER_ERROR
+                print("c> CONNECT FAIL")
+                return client.RC.USER_ERROR
+            else:
+                print("c> CONNECT FAIL")
+                return client.RC.ERROR
+                
+        except socket.error:
+            print("c> CONNECT FAIL")
+            return client.RC.ERROR
+        finally:
+            sock.close()
 
     # *
     # * 
@@ -159,8 +209,43 @@ class client :
     # * @return ERROR if another error occurred
     @staticmethod
     def  disconnect(user) :
-        #  Write your code here
-        return client.RC.ERROR
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (client._server, client._port)
+        
+        try:
+            sock.connect(server_address)
+            
+            # Enviar operación DISCONNECT
+            sock.sendall("DISCONNECT\0".encode('utf-8'))
+            
+            # Enviar nombre de usuario
+            sock.sendall(f"{user}\0".encode('utf-8'))
+            
+            # Recibir el byte de estado
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> DISCONNECT FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little')
+            
+            if code == 0:
+                print("c> DISCONNECT OK")
+                return client.RC.OK
+            elif code == 1 or code == 2:
+                # 1: No existe, 2: No estaba conectado
+                print("c> DISCONNECT FAIL")
+                return client.RC.USER_ERROR
+            else:
+                print("c> DISCONNECT FAIL")
+                return client.RC.ERROR
+                
+        except socket.error:
+            print("c> DISCONNECT FAIL")
+            return client.RC.ERROR
+        finally:
+            sock.close()
 
     # *
     # * @param user    - Receiver user name
