@@ -46,6 +46,12 @@ void *procesar_peticion(void* socket_especifico_fd){
     unsigned char resultado; // para devolver posteriormente el resultado de la operación
     user_node_t *usuario_actual = NULL; // donde almacenaremos el usuario en las operaciones
 
+    // Variables para la conexión
+    char puerto_cliente[16];
+    struct sockaddr_in peer_addr; // Almacena la dirección de red del cliente conectado (IP y puerto)
+    socklen_t peer_len = sizeof(peer_addr); // Variable que indica el tamaño de la estructura peer_addr, necesaria para getpeername
+    char ip_cliente[INET_ADDRSTRLEN]; // Almacena la dirección IP del cliente en formato texto
+
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
@@ -65,7 +71,7 @@ void *procesar_peticion(void* socket_especifico_fd){
 
         // Leer el nombre de usuario a registrar
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
-            // TODO: si es mayor que 256 simplemente lee hasta 256, es eso lo esperado o deberia lanzar error? lanzar error comparando con strlen el buffer
+            // TODO: no sé cómo lanzar error si la cadena recibida es >256, creo que no necesario así que se queda así
             printf("REGISTER: Error leyendo el nombre de usuario\n");
             close(fd_local);
             pthread_exit(NULL);
@@ -92,7 +98,10 @@ void *procesar_peticion(void* socket_especifico_fd){
         // Enviar el resultado
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta");
+            // No hacemos pthread_exit ni close porque ya se hace al final 
+            // de la función (que se ejecutará inmediatamente después de esto)
         }
+
     } else if (strcmp(instruccion, "UNREGISTER") == 0){
         
         // Leer el nombre del usuario a borrar
@@ -127,7 +136,76 @@ void *procesar_peticion(void* socket_especifico_fd){
             perror("Error enviando respuesta");
         }
     }
-    else if (strcmp(instruccion, "CONNECT") == 0){}
+    else if (strcmp(instruccion, "CONNECT") == 0){
+
+        // Leer el nombre de usuario
+        if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
+            resultado = 3; // Fallo genérico
+            printf("s> CONNECT FAIL\n"); 
+            
+            if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+                perror("Error enviando respuesta de CONNECT");
+            }
+
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        // Leer el puerto de escucha del cliente
+        if (readLine(fd_local, puerto_cliente, 16) < 0){
+            resultado = 3; // Fallo genérico
+            printf("s> CONNECT %s FAIL\n", buffer);
+
+            if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+                perror("Error enviando respuesta de CONNECT");
+            }
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+        
+        if (getpeername(fd_local, (struct sockaddr*)&peer_addr, &peer_len) == 0) {
+            // inet_ntop es la versión segura para hilos de inet_ntoa
+            // (usa nuestro propio búfer en vez de un búfer global compartido)
+            inet_ntop(AF_INET, &peer_addr.sin_addr, ip_cliente, INET_ADDRSTRLEN);
+        } else {
+            // Si hay error inesperado, aseguramos que el usuario tiene una cadena válida
+            strcpy(ip_cliente, "0.0.0.0"); 
+        }
+
+        // Modificar el estado del usuario
+        pthread_mutex_lock(&mutex_usuarios);
+        
+        usuario_actual = find_user(head, buffer);
+
+        if (usuario_actual == NULL) {
+            resultado = 1; // El usuario no existe
+            printf("s> CONNECT %s FAIL\n", buffer);
+        } 
+        else if (usuario_actual->estado == ESTADO_CONECTADO) {
+            resultado = 2; // El usuario ya está conectado
+            printf("s> CONNECT %s FAIL\n", buffer);
+        } 
+        else {
+            // Usuario existe y está desconectado: actualizamos datos y conectamos
+            strncpy(usuario_actual->ip, ip_cliente, INET_ADDRSTRLEN);
+            strncpy(usuario_actual->puerto, puerto_cliente, 16);
+            usuario_actual->estado = ESTADO_CONECTADO;
+            
+            resultado = 0; // Éxito
+            printf("s> CONNECT %s OK\n", buffer);
+            
+            // TODO: Según el protocolo, aquí deberíamos enviar todos los mensajes 
+            // pendientes almacenados en usuario_actual->mensajes
+            // Lo dejaremos para cuando implementemos SEND.
+        }
+
+        pthread_mutex_unlock(&mutex_usuarios);
+
+        // Enviar el código de respuesta al cliente
+        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+            perror("Error enviando respuesta de CONNECT");
+        }
+    }
     else if (strcmp(instruccion, "DISCONNECT") == 0){}
     else if (strcmp(instruccion, "USERS") == 0){}
     else if (strcmp(instruccion, "SEND") == 0){}
