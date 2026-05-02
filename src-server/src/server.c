@@ -52,6 +52,9 @@ void *procesar_peticion(void* socket_especifico_fd){
     socklen_t peer_len = sizeof(peer_addr); // Variable que indica el tamaño de la estructura peer_addr, necesaria para getpeername
     char ip_cliente[INET_ADDRSTRLEN]; // Almacena la dirección IP del cliente en formato texto
 
+    // Variables para USERS (contar cuántos están conectados)
+    uint32_t num_conectados = 0;
+    user_node_t *curr;
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
@@ -244,11 +247,76 @@ void *procesar_peticion(void* socket_especifico_fd){
             perror("Error enviando respuesta de DISCONNECT");
         }
 
-    } else if (strcmp(instruccion, "USERS") == 0){}
-    else if (strcmp(instruccion, "SEND") == 0){}
-    else if (strcmp(instruccion, "SENDATTACH") == 0){}
-    else if (strcmp(instruccion, "QUIT") == 0){}
-    else {
+    } else if (strcmp(instruccion, "USERS") == 0) {
+        uint32_t num_conectados = 0;
+        user_node_t *curr;
+
+        // Leer el nombre del usuario que hace la petición
+        if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0) {
+            resultado = 1; // Error
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
+                perror("Error enviando resultado");
+            }
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        pthread_mutex_lock(&mutex_usuarios);
+
+        // Verificar que el usuario que pide la lista está conectado
+        usuario_actual = find_user(head, buffer);
+
+        if (usuario_actual == NULL || usuario_actual->estado == ESTADO_DESCONECTADO) {
+            resultado = 1;
+            pthread_mutex_unlock(&mutex_usuarios);
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
+                perror("Error enviando resultado");
+            }
+        } 
+        else {
+            // Contar cuántos usuarios están conectados
+            resultado = 0;
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
+                perror("Error enviando resultado");
+            }
+
+            curr = head;
+            while (curr != NULL) {
+                if (curr->estado == ESTADO_CONECTADO) num_conectados++;
+                curr = curr->next;
+            }
+
+            // Enviar el número de usuarios (Big Endian)
+            uint32_t num_net = htonl(num_conectados);
+            if (sendMessage(fd_local, (char *)&num_net, sizeof(uint32_t)) < 0) {
+                perror("Error enviando número de usuarios");
+            }
+
+            // Enviar los datos de cada usuario conectado
+            curr = head;
+            while (curr != NULL) {
+                if (curr->estado == ESTADO_CONECTADO) {
+                    // Nombre\0 + IP\0 + puerto\0
+                    if (sendMessage(fd_local, curr->userName, strlen(curr->userName) + 1) < 0) {
+                        perror("Error enviando nombre de usuario");
+                    }
+                    if (sendMessage(fd_local, curr->ip, strlen(curr->ip) + 1) < 0) {
+                        perror("Error enviando IP de usuario");
+                    }
+                    if (sendMessage(fd_local, curr->puerto, strlen(curr->puerto) + 1) < 0) {
+                        perror("Error enviando puerto de usuario");
+                    }
+                }
+                curr = curr->next;
+            }
+            pthread_mutex_unlock(&mutex_usuarios);
+            printf("s> USERS %s OK\n", buffer);
+        }
+    } else if (strcmp(instruccion, "SEND") == 0){
+
+    } else if (strcmp(instruccion, "SENDATTACH") == 0){
+
+    } else {
         printf("Comando desconocido: %s\n", instruccion);
         resultado = 2; // Error de comando
 
