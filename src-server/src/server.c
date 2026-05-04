@@ -55,6 +55,7 @@ void *procesar_peticion(void* socket_especifico_fd){
     // Variables para USERS (contar cuántos están conectados)
     uint32_t num_conectados = 0;
     user_node_t *curr;
+    char num_str[16]; // Buffer para almacenar el número de usuarios como cadena
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
@@ -248,33 +249,43 @@ void *procesar_peticion(void* socket_especifico_fd){
         }
 
     } else if (strcmp(instruccion, "USERS") == 0) {
-        uint32_t num_conectados = 0;
-        user_node_t *curr;
 
         // Leer el nombre del usuario que hace la petición
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0) {
-            resultado = 1; // Error
+            resultado = 2; // Error de lectura (cualquier otro error = 2)
             if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
                 perror("Error enviando resultado");
             }
+            printf("s> CONNECTEDUSERS FAIL\n");
             close(fd_local);
             pthread_exit(NULL);
         }
 
         pthread_mutex_lock(&mutex_usuarios);
 
-        // Verificar que el usuario que pide la lista está conectado
+        // Buscar al usuario que hace la petición
         usuario_actual = find_user(head, buffer);
 
-        if (usuario_actual == NULL || usuario_actual->estado == ESTADO_DESCONECTADO) {
+        if (usuario_actual == NULL) {
+            // El usuario no está registrado
+            resultado = 2;
+            pthread_mutex_unlock(&mutex_usuarios);
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
+                perror("Error enviando resultado");
+            }
+            printf("s> CONNECTEDUSERS FAIL\n");
+        } 
+        else if (usuario_actual->estado == ESTADO_DESCONECTADO) {
+            // El usuario existe pero no está conectado
             resultado = 1;
             pthread_mutex_unlock(&mutex_usuarios);
             if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
                 perror("Error enviando resultado");
             }
-        } 
+            printf("s> CONNECTEDUSERS FAIL\n");
+        }
         else {
-            // Contar cuántos usuarios están conectados
+            // El usuario existe y está conectado (Éxito)
             resultado = 0;
             if (sendMessage(fd_local, (char *)&resultado, 1) < 0) {
                 perror("Error enviando resultado");
@@ -286,9 +297,9 @@ void *procesar_peticion(void* socket_especifico_fd){
                 curr = curr->next;
             }
 
-            // Enviar el número de usuarios (Big Endian)
-            uint32_t num_net = htonl(num_conectados);
-            if (sendMessage(fd_local, (char *)&num_net, sizeof(uint32_t)) < 0) {
+            // Enviar el número de usuarios como cadena terminada en \0
+            sprintf(num_str, "%u", num_conectados);
+            if (sendMessage(fd_local, num_str, strlen(num_str) + 1) < 0) {
                 perror("Error enviando número de usuarios");
             }
 
@@ -310,7 +321,9 @@ void *procesar_peticion(void* socket_especifico_fd){
                 curr = curr->next;
             }
             pthread_mutex_unlock(&mutex_usuarios);
-            printf("s> USERS %s OK\n", buffer);
+            
+            // Imprimir traza en el servidor según especificación
+            printf("s> CONNECTEDUSERS OK\n");
         }
     } else if (strcmp(instruccion, "SEND") == 0){
 
