@@ -17,6 +17,21 @@ class client :
     _port = -1
 
     # ******************** METHODS *******************
+
+    # Función auxiliar para leer cadenas terminadas en \0 byte a byte
+    def _read_string(s):
+        res = b""
+        while True:
+            b = s.recv(1)
+            if not b or b == b'\x00': # True cuando b es \0
+                break
+            res += b
+        return res.decode('utf-8')
+
+
+
+
+
     # *
     # * @param user - User name to register in the system
     # * 
@@ -195,9 +210,70 @@ class client :
     # * @return USER_ERROR if the user does not exist or if it is already connected
     # * @return ERROR if another error occurred
     @staticmethod
-    def  users() :
-        #  Write your code here
-        return client.RC.ERROR
+    def users(user) :
+        
+        # Creación del socket TCP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (client._server, client._port)
+        
+        try:
+            # Conexión al servidor
+            sock.connect(server_address)
+            
+            # Envío de la instrucción USERS
+            sock.sendall("USERS\0".encode('utf-8'))
+            
+            # Envío del nombre de usuario que hace la petición (Parte 2)
+            sock.sendall(f"{user}\0".encode('utf-8'))
+            
+            # Lectura del byte de respuesta
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> CONNECTED USERS FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little')
+            
+            if code == 0:
+                # Usar f. auxiliar para leer bytes 1 a 1
+                num_users_str = client._read_string(sock)
+
+                # Solo se convierte si la cadena únicamente tiene dígitos
+                num_users = int(num_users_str) if num_users_str.isdigit() else 0
+                
+                print(f"c> CONNECTED USERS ({num_users} users connected) OK")
+                
+                client._connected_users.clear() # Limpiamos antes de refrescar
+                
+                # Leer los datos de cada usuario
+                for _ in range(num_users):
+                    # En la Parte 2 se lee UNA sola cadena con formato "usuario: IP: puerto"
+                    user_info = client._read_string(sock)
+                    print(user_info) # Se imprime tal cual viene
+                    
+                    # Dividir para guardarlo en el diccionario para GETFILE
+                    partes = [p.strip() for p in user_info.split(':')]
+                    if len(partes) >= 3:
+                        uname = partes[0]
+                        u_ip = partes[1]
+                        u_port = partes[2]
+                        client._connected_users[uname] = (u_ip, u_port)
+                    
+                return client.RC.OK
+                
+            elif code == 1:
+                print("c> CONNECTED USERS FAIL, USER IS NOT CONNECTED")
+                return client.RC.USER_ERROR
+            else:
+                print("c> CONNECTED USERS FAIL")
+                return client.RC.ERROR
+                
+        except socket.error:
+            print("c> CONNECTED USERS FAIL")
+            return client.RC.ERROR
+        finally:
+            sock.close()
 
 
 
@@ -311,10 +387,10 @@ class client :
                             print("Syntax error. Usage: DISCONNECT <userName>")
 
                     elif(line[0]=="USERS") :
-                        if (len(line) == 1) :
-                            client.users()
+                        if (len(line) == 2) :
+                            client.users(line[1])
                         else :
-                            print("Syntax error. Usage: CONNECTED_USERS <userName>")
+                            print("Syntax error. Usage: USERS <userName>")
 
                     elif(line[0]=="SEND") :
                         if (len(line) >= 3) :
