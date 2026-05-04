@@ -305,7 +305,7 @@ class client :
                     print(user_info) # Se imprime tal cual viene
                     
                     # Dividir para guardarlo en el diccionario para GETFILE
-                    partes = [p.strip() for p in user_info.split(':')]
+                    partes = [p.strip() for p in user_info.split('::')]
                     if len(partes) >= 3:
                         uname = partes[0]
                         u_ip = partes[1]

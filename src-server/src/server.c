@@ -56,6 +56,7 @@ void *procesar_peticion(void* socket_especifico_fd){
     uint32_t num_conectados = 0;
     user_node_t *curr;
     char num_str[16]; // Buffer para almacenar el número de usuarios como cadena
+    char info_str[512]; // Búfer para construir la cadena de la Parte 2
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
@@ -307,15 +308,11 @@ void *procesar_peticion(void* socket_especifico_fd){
             curr = head;
             while (curr != NULL) {
                 if (curr->estado == ESTADO_CONECTADO) {
-                    // Nombre\0 + IP\0 + puerto\0
-                    if (sendMessage(fd_local, curr->userName, strlen(curr->userName) + 1) < 0) {
-                        perror("Error enviando nombre de usuario");
-                    }
-                    if (sendMessage(fd_local, curr->ip, strlen(curr->ip) + 1) < 0) {
-                        perror("Error enviando IP de usuario");
-                    }
-                    if (sendMessage(fd_local, curr->puerto, strlen(curr->puerto) + 1) < 0) {
-                        perror("Error enviando puerto de usuario");
+                    // Fusionar en una sola cadena (Parte 2: "usuario:: IP:: puerto")
+                    sprintf(info_str, "%s :: %s :: %s", curr->userName, curr->ip, curr->puerto)
+                    
+                    if (sendMessage(fd_local, info_str, strlen(info_str) + 1) < 0) {
+                        perror("Error enviando información de usuario");
                     }
                 }
                 curr = curr->next;
