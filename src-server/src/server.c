@@ -309,7 +309,7 @@ void *procesar_peticion(void* socket_especifico_fd){
             while (curr != NULL) {
                 if (curr->estado == ESTADO_CONECTADO) {
                     // Fusionar en una sola cadena (Parte 2: "usuario:: IP:: puerto")
-                    sprintf(info_str, "%s :: %s :: %s", curr->userName, curr->ip, curr->puerto)
+                    sprintf(info_str, "%s :: %s :: %s", curr->userName, curr->ip, curr->puerto);
                     
                     if (sendMessage(fd_local, info_str, strlen(info_str) + 1) < 0) {
                         perror("Error enviando información de usuario");
