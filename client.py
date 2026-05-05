@@ -22,6 +22,12 @@ class client :
     _listen_sock = None
     _is_connected = False
 
+    # Atributo para SEND: El cliente no recibe su propio nombre como 
+    # argumento, por tanto es imprescindible que la instancia del 
+    # cliente recuerde quién está usando actualmente la interfaz
+    # (en el enunciado, 6.4, pone que hay un usuario conectado por interfaz)
+    _current_user = None
+
     # ******************** METHODS *******************
 
     # Función auxiliar para leer cadenas terminadas en \0 byte a byte
@@ -238,6 +244,7 @@ class client :
             code = int.from_bytes(res, byteorder='little')
             
             if code == 0:
+                client._current_user = user # Guardar el cliente para poder hacer SEND
                 print("c> CONNECT OK")
                 return client.RC.OK
             else:
@@ -392,9 +399,65 @@ class client :
     # * @return USER_ERROR if the user is not connected (the message is queued for delivery)
     # * @return ERROR the user does not exist or another error occurred
     @staticmethod
-    def  send(user,  message) :
-        #  Write your code here
-        return client.RC.ERROR
+    def send(user, message) :
+        
+        # Validar que el cliente haya hecho un CONNECT previo y sepamos quién es
+        if not client._current_user:
+            print("c> SEND FAIL")
+            return client.RC.ERROR
+            
+        # TODO Parte 2: Hacer aquí la petición HTTP al Servicio Web 
+        # local pasándole 'message'. El string que devuelve el servicio web
+        # será el nuevo 'message' normalizado que enviaremos por el socket.
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_address = (client._server, client._port)
+        
+        try:
+            sock.connect(server_address)
+            
+            # Enviar operación SEND
+            sock.sendall("SEND\0".encode('utf-8'))
+            
+            # Enviar nombre del remitente (usuario actual)
+            sock.sendall(f"{client._current_user}\0".encode('utf-8'))
+            
+            # Enviar nombre del destinatario
+            sock.sendall(f"{user}\0".encode('utf-8'))
+            
+            # Enviar el cuerpo del mensaje (máximo 255 caracteres + \0)
+            sock.sendall(f"{message}\0".encode('utf-8'))
+            
+            # Recibir el byte de resultado
+            res = sock.recv(1)
+            
+            if not res:
+                print("c> SEND FAIL")
+                return client.RC.ERROR
+                
+            code = int.from_bytes(res, byteorder='little')
+            
+            if code == 0:
+                # En caso de éxito, el servidor devuelve una cadena con el ID asignado
+                msg_id = client._read_string(sock)
+                print(f"c> SEND OK MESSAGE {msg_id}")
+                return client.RC.OK
+                
+            elif code == 1:
+                # Código 1: El usuario destinatario o el remitente no existen
+                print("c> SEND FAIL, USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+                
+            else:
+                # Código 2: Cualquier otro error en el servidor
+                print("c> SEND FAIL")
+                return client.RC.ERROR
+                
+        except socket.error:
+            print("c> SEND FAIL")
+            return client.RC.ERROR
+        finally:
+            sock.close()
 
     # *
     # * @param user    - Receiver user name

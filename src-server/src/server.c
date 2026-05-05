@@ -58,6 +58,8 @@ void *procesar_peticion(void* socket_especifico_fd){
     char num_str[16]; // Buffer para almacenar el número de usuarios como cadena
     char info_str[512]; // Búfer para construir la cadena de la Parte 2
 
+    // TODO: revisar luego sizeofs y cosas así con el profe sabiendo que hemos puesto las variables al ppio tal y como dijo
+
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
     free(socket_especifico_fd);
 
