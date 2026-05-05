@@ -58,6 +58,21 @@ void *procesar_peticion(void* socket_especifico_fd){
     char num_str[16]; // Buffer para almacenar el número de usuarios como cadena
     char info_str[512]; // Búfer para construir la cadena de la Parte 2
 
+    // Variables para SEND
+
+    // Buffers de texto
+    char remitente[MSG_MAX_SIZE];
+    char destinatario[MSG_MAX_SIZE];
+    char texto[MSG_MAX_SIZE];
+    char id_str[16];
+
+    unsigned int msg_id; // Id del mensaje
+
+    // Usuarios remitente y destino
+    user_node_t *user_rem;
+    user_node_t *user_dest;
+
+
     // TODO: revisar luego sizeofs y cosas así con el profe sabiendo que hemos puesto las variables al ppio tal y como dijo
 
     // Ya hemos copiado el valor: liberamos la memoria dinámica cuanto antes.
@@ -324,8 +339,202 @@ void *procesar_peticion(void* socket_especifico_fd){
             // Imprimir traza en el servidor según especificación
             printf("s> CONNECTEDUSERS OK\n");
         }
-    } else if (strcmp(instruccion, "SEND") == 0){
+    } else if (strcmp(instruccion, "SEND") == 0) {
+        
 
+        // 1. Leer remitente, destinatario y mensaje
+        // Se leen secuencialmente los tres campos delimitados por \0
+        if (readLine(fd_local, remitente, MSG_MAX_SIZE) < 0 ||
+            readLine(fd_local, destinatario, MSG_MAX_SIZE) < 0 ||
+            readLine(fd_local, texto, MSG_MAX_SIZE) < 0) { 
+            
+            resultado = 2; // Error genérico d lectura
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) perror("Error enviando error");
+            close(fd_local);
+            pthread_exit(NULL);
+        }
+
+        // Bloquear mutex para operar sobre la lista de usuarios
+        pthread_mutex_lock(&mutex_usuarios);
+
+        // 2. Comprobar que existen ambos usuarios
+        user_rem = find_user(head, remitente);
+        user_dest = find_user(head, destinatario);
+
+        if (user_rem == NULL || user_dest == NULL) {
+            resultado = 1; // Alguno de los dos usuarios no existe -> código 1
+            pthread_mutex_unlock(&mutex_usuarios);
+            
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) perror("Error enviando error");
+            printf("s> SEND FAIL\n"); 
+        } 
+        else {
+            // 3. Asignar ID al mensaje
+            // La variable de tipo unsigned int vuelve a 0 si desborda, y el protocolo dice que el siguiente debe ser 1
+            user_rem->ultimo_id_msg++;
+            if (user_rem->ultimo_id_msg == 0) {
+                user_rem->ultimo_id_msg = 1; 
+            }
+            msg_id = user_rem->ultimo_id_msg;
+            sprintf(id_str, "%u", msg_id);
+
+            // 4. Almacenar el mensaje en memoria dinámica
+            mensaje_pendiente_t *nuevo_msg = (mensaje_pendiente_t *)malloc(sizeof(mensaje_pendiente_t));
+            nuevo_msg->id = msg_id;
+
+            // Forzar terminador nulo al final de las cadenas
+            strncpy(nuevo_msg->remitente, remitente, MSG_MAX_SIZE - 1);
+            nuevo_msg->remitente[MSG_MAX_SIZE - 1] = '\0';
+            strncpy(nuevo_msg->texto, texto, MSG_MAX_SIZE - 1);
+            nuevo_msg->texto[MSG_MAX_SIZE - 1] = '\0';
+            // strncpy(nuevo_msg->fichero, "", MSG_MAX_SIZE - 1); // TODO: Descomentar en la Parte 2
+            // nuevo_msg->fichero[MSG_MAX_SIZE - 1] = '\0';
+            nuevo_msg->next = NULL;
+
+            // Añadir el mensaje al final de la cola del destinatario
+            if (user_dest->mensajes == NULL) {
+                user_dest->mensajes = nuevo_msg;
+            } else {
+                mensaje_pendiente_t *aux = user_dest->mensajes;
+                // Recorrer hasta el final si no está vacía
+                while (aux->next != NULL) {
+                    aux = aux->next;
+                }
+                aux->next = nuevo_msg;
+            }
+
+            // 5. Responder al remitente con éxito
+            resultado = 0;
+            sendMessage(fd_local, (char *)&resultado, 1);
+            sendMessage(fd_local, id_str, strlen(id_str) + 1); // +1 para incluir \0
+
+            // 6. Gestionar el envío asíncrono
+            if (user_dest->estado == ESTADO_CONECTADO) {
+                // Copiar IPs y puertos en variables locales para poder hacer el unlock del mutex 
+                // antes de usar connect(), evitando bloquear el servidor si la red va lenta
+                char ip_dest[INET_ADDRSTRLEN], puerto_dest[16];
+                strncpy(ip_dest, user_dest->ip, INET_ADDRSTRLEN - 1); 
+                ip_dest[INET_ADDRSTRLEN - 1] = '\0';
+                strncpy(puerto_dest, user_dest->puerto, 15); 
+                puerto_dest[15] = '\0';
+                
+                int rem_conectado = (user_rem->estado == ESTADO_CONECTADO);
+                char ip_rem[INET_ADDRSTRLEN], puerto_rem[16];
+                if (rem_conectado) {
+                    // De nuevo, copiar las cadenas asegurando '\0'
+                    strncpy(ip_rem, user_rem->ip, INET_ADDRSTRLEN - 1); 
+                    ip_rem[INET_ADDRSTRLEN - 1] = '\0';
+                    strncpy(puerto_rem, user_rem->puerto, 15); 
+                    puerto_rem[15] = '\0';
+                }
+
+                pthread_mutex_unlock(&mutex_usuarios);
+
+                // Aquí el servidor actuará como cliente
+                
+                // Conectar al destinatario
+                int fd_dest = socket(AF_INET, SOCK_STREAM, 0);
+                struct sockaddr_in addr_dest;
+                memset(&addr_dest, 0, sizeof(addr_dest));
+                addr_dest.sin_family = AF_INET;
+                addr_dest.sin_port = htons(atoi(puerto_dest)); // cadena -> int -> red
+                addr_dest.sin_addr.s_addr = inet_addr(ip_dest);
+
+                int entrega_ok = 0; // Flag para control de errores: 1 si connect y sendMessages tienen éxito, 0 eoc
+                
+                // Intentar conectar al socket de escucha del destinatario
+                if (connect(fd_dest, (struct sockaddr *)&addr_dest, sizeof(addr_dest)) == 0) {
+                    entrega_ok = 1;
+                    // Enviar operación, remitente, ID y texto secuencialmente, comprobando fallos
+                    if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, remitente, strlen(remitente) + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, texto, strlen(texto) + 1) < 0) entrega_ok = 0;
+                    
+                    // Cerrar la conexión con el destinatario tras el envío
+                    close(fd_dest);
+
+                    // Proceder con el ACK y el borrado solo si la entrega fue exitosa
+                    if (entrega_ok) {
+
+                        // Enviar notificación (ACK) al remitente si se encuentra conectado
+                        if (rem_conectado) {
+
+                            // Crear y configurar socket correspondiente
+                            int fd_rem = socket(AF_INET, SOCK_STREAM, 0);
+                            struct sockaddr_in addr_rem;
+                            memset(&addr_rem, 0, sizeof(addr_rem));
+                            addr_rem.sin_family = AF_INET;
+                            addr_rem.sin_port = htons(atoi(puerto_rem));
+                            addr_rem.sin_addr.s_addr = inet_addr(ip_rem);
+
+                            // Conectar y enviar la instrucción SEND_MESS_ACK junto con el ID
+                            if (connect(fd_rem, (struct sockaddr *)&addr_rem, sizeof(addr_rem)) == 0) {
+                                sendMessage(fd_rem, "SEND_MESS_ACK", strlen("SEND_MESS_ACK") + 1);
+                                sendMessage(fd_rem, id_str, strlen(id_str) + 1);
+                                close(fd_rem);
+                            }
+                        }
+
+                        // Bloquear el mutex para eliminar el mensaje de la cola
+                        pthread_mutex_lock(&mutex_usuarios);
+
+                        // Buscar nuevamente al destinatario por si su estado ha cambiado
+                        user_node_t *check_dest = find_user(head, destinatario);
+                        if (check_dest != NULL) {
+                            mensaje_pendiente_t *ant = NULL;
+                            mensaje_pendiente_t *act = check_dest->mensajes;
+
+                            // Recorrer la lista de mensajes pendientes
+                            while (act != NULL) {
+                                // Buscar el mensaje por su ID exacto para evitar condiciones de carrera
+                                if (act->id == msg_id) {
+
+                                    // Desenlazar el nodo de la lista y liberar memoria asociada
+                                    if (ant == NULL) check_dest->mensajes = act->next;
+                                    else ant->next = act->next;
+                                    free(act);
+                                    break;
+                                }
+                                ant = act;
+                                act = act->next;
+                            }
+                        }
+                        // Liberar el mutex al terminar de modificar la cola
+                        pthread_mutex_unlock(&mutex_usuarios);
+
+                        // Imprimir éxito
+                        printf("s> SEND MESSAGE %u FROM %s TO %s\n", msg_id, remitente, destinatario);
+                    }
+                } 
+                else {
+                    close(fd_dest); // Fallo de conexión
+                }
+
+                // Gestionar errores de red (fallo en connect o en los sendMessage)
+                if (!entrega_ok) {
+                    // Bloquear mutex para modificar el estado del destinatario
+                    pthread_mutex_lock(&mutex_usuarios);
+
+                    user_node_t *check_dest = find_user(head, destinatario);
+                    if (check_dest != NULL) {
+                        // Marcar como desconectado y limpiar sus datos
+                        check_dest->estado = ESTADO_DESCONECTADO;
+                        memset(check_dest->ip, 0, sizeof(check_dest->ip));
+                        memset(check_dest->puerto, 0, sizeof(check_dest->puerto));
+                    }
+                    pthread_mutex_unlock(&mutex_usuarios);
+                    
+                    // El mensaje se mantiene STORED porque no fue eliminado de la cola
+                    printf("s> MESSAGE %u FROM %s TO %s STORED\n", msg_id, remitente, destinatario);
+                }
+            } 
+            else {
+                // El destinatario ya estaba desconectado
+                pthread_mutex_unlock(&mutex_usuarios);
+                printf("s> MESSAGE %u FROM %s TO %s STORED\n", msg_id, remitente, destinatario);
+            }
+        }
     } else if (strcmp(instruccion, "SENDATTACH") == 0){
 
     } else {
