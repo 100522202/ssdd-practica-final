@@ -61,25 +61,24 @@ class client :
                     remitente = client._read_string(conn)
                     msg_id = client._read_string(conn)
                     mensaje = client._read_string(conn)
-                    # El salto de línea extra (\n) al principio y reescribir c>
-                    # evita que el mensaje asíncrono rompa la consola del usuario.
-                    print(f"\ns> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nc> ", end="", flush=True)
+                    # El \r evita que se imprima un espacio en blanco no esperado
+                    print(f"\rs> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nc> ", end="", flush=True)
                     
                 elif op == "SEND_MESS_ACK":
                     msg_id = client._read_string(conn)
-                    print(f"\nc> SEND MESSAGE {msg_id} OK\nc> ", end="", flush=True)
+                    print(f"\rc> SEND MESSAGE {msg_id} OK\nc> ", end="", flush=True)
                     
                 elif op == "SEND_MESSAGE_ATTACH":
                     remitente = client._read_string(conn)
                     msg_id = client._read_string(conn)
                     mensaje = client._read_string(conn)
                     fichero = client._read_string(conn)
-                    print(f"\ns> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nFILE {fichero}\nc> ", end="", flush=True)
+                    print(f"\rs> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nFILE {fichero}\nc> ", end="", flush=True)
                     
                 elif op == "SEND_MESS_ATTACH_ACK":
                     msg_id = client._read_string(conn)
                     fichero = client._read_string(conn)
-                    print(f"\nc> SENDATTACH MESSAGE {msg_id} {fichero} OK\nc> ", end="", flush=True)
+                    print(f"\rc> SENDATTACH MESSAGE {msg_id} {fichero} OK\nc> ", end="", flush=True)
                     
                 # TODO: Aquí en el futuro añadiremos el "GET_FILE" de la Parte 2
                 

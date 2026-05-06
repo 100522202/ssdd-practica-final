@@ -72,6 +72,12 @@ void *procesar_peticion(void* socket_especifico_fd){
     user_node_t *user_rem;
     user_node_t *user_dest;
 
+    // Variables para gestionar la entrega de mensajes pendientes
+    mensaje_pendiente_t *mensajes_a_enviar = NULL;
+    char dest_name[MSG_MAX_SIZE];
+    char dest_ip[INET_ADDRSTRLEN];
+    char dest_puerto[16];
+    int entrega_ok = 0;     // Flag para manejar más fácilmente los errores
 
     // TODO: revisar luego sizeofs y cosas así con el profe sabiendo que hemos puesto las variables al ppio tal y como dijo
 
@@ -157,7 +163,7 @@ void *procesar_peticion(void* socket_especifico_fd){
         if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
             perror("Error enviando respuesta");
         }
-    } else if (strcmp(instruccion, "CONNECT") == 0){
+    } else if (strcmp(instruccion, "CONNECT") == 0) {
 
         // Leer el nombre de usuario
         if (readLine(fd_local, buffer, MSG_MAX_SIZE) < 0){
@@ -167,7 +173,6 @@ void *procesar_peticion(void* socket_especifico_fd){
             if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
                 perror("Error enviando respuesta de CONNECT");
             }
-
             close(fd_local);
             pthread_exit(NULL);
         }
@@ -184,28 +189,32 @@ void *procesar_peticion(void* socket_especifico_fd){
             pthread_exit(NULL);
         }
         
+        // Obtener la IP real del cliente a través del descriptor del socket
         if (getpeername(fd_local, (struct sockaddr*)&peer_addr, &peer_len) == 0) {
-            // inet_ntop es la versión segura para hilos de inet_ntoa
-            // (usa nuestro propio búfer en vez de un búfer global compartido)
             inet_ntop(AF_INET, &peer_addr.sin_addr, ip_cliente, INET_ADDRSTRLEN);
         } else {
-            // Si hay error inesperado, aseguramos que el usuario tiene una cadena válida
+            // Asignar IP por defecto en caso de fallo crítico en getpeername
             strcpy(ip_cliente, "0.0.0.0"); 
         }
 
-        // Modificar el estado del usuario
+        // Modificar el estado del usuario: lock
         pthread_mutex_lock(&mutex_usuarios);
         
+        // Buscar al usuario
         usuario_actual = find_user(head, buffer);
 
         if (usuario_actual == NULL) {
             resultado = 1; // El usuario no existe
             printf("s> CONNECT %s FAIL\n", buffer);
+            pthread_mutex_unlock(&mutex_usuarios);
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) perror("Error enviando respuesta");
         } else if (usuario_actual->estado == ESTADO_CONECTADO) {
             resultado = 2; // El usuario ya está conectado
             printf("s> CONNECT %s FAIL\n", buffer);
+            pthread_mutex_unlock(&mutex_usuarios);
+            if (sendMessage(fd_local, (char *)&resultado, 1) < 0) perror("Error enviando respuesta");
         } else {
-            // Usuario existe y está desconectado: actualizamos datos y conectamos
+            // Usuario existe y está desconectado: actualizamos datos
             strncpy(usuario_actual->ip, ip_cliente, INET_ADDRSTRLEN);
             strncpy(usuario_actual->puerto, puerto_cliente, 16);
             usuario_actual->estado = ESTADO_CONECTADO;
@@ -213,16 +222,134 @@ void *procesar_peticion(void* socket_especifico_fd){
             resultado = 0; // Éxito
             printf("s> CONNECT %s OK\n", buffer);
             
-            // TODO: Según el protocolo, aquí deberíamos enviar todos los mensajes 
-            // pendientes almacenados en usuario_actual->mensajes
-            // Lo dejaremos para cuando implementemos SEND.
-        }
+            // Desacoplar la cola de mensajes pendientes para procesarla sin bloquear el servidor
+            mensajes_a_enviar = usuario_actual->mensajes;
+            // Vaciar la cola del usuario en la estructura global
+            usuario_actual->mensajes = NULL;
+            
+            // Guardar copias locales de los datos de conexión para usarlos fuera del mutex
+            strncpy(dest_name, buffer, MSG_MAX_SIZE);
+            strncpy(dest_ip, ip_cliente, INET_ADDRSTRLEN);
+            strncpy(dest_puerto, puerto_cliente, 16);
 
-        pthread_mutex_unlock(&mutex_usuarios);
+            pthread_mutex_unlock(&mutex_usuarios);
 
-        // Enviar el código de respuesta al cliente
-        if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
-            perror("Error enviando respuesta de CONNECT");
+            // Enviar el OK al cliente ANTES de enviarle los mensajes
+            // Permite que el cliente cierre su connect() y abra el hilo de escucha a tiempo
+            if (sendMessage(fd_local, (char *)&resultado, sizeof(unsigned char)) < 0) {
+                perror("Error enviando respuesta de CONNECT");
+            }
+
+            // PROCESAR LA COLA DE MENSAJES PENDIENTES
+            mensaje_pendiente_t *act = mensajes_a_enviar;
+            // Recorrer la lista de mensajes
+            while (act != NULL) {
+                // Guardar el puntero al siguiente mensaje antes de procesar/liberar el actual
+                mensaje_pendiente_t *sig = act->next;
+                
+                // Crear y configurar el socket para enviar el mensaje al destinatario
+                int fd_dest = socket(AF_INET, SOCK_STREAM, 0);
+                struct sockaddr_in addr_dest;
+                memset(&addr_dest, 0, sizeof(addr_dest));
+                addr_dest.sin_family = AF_INET;
+                addr_dest.sin_port = htons(atoi(dest_puerto));
+                addr_dest.sin_addr.s_addr = inet_addr(dest_ip);
+                
+                // ID número a str
+                sprintf(id_str, "%u", act->id);
+
+                // Intentar establecer la conexión TCP con el destinatario recién conectado
+                if (connect(fd_dest, (struct sockaddr *)&addr_dest, sizeof(addr_dest)) == 0) {
+                    entrega_ok = 1; // Éxito (si falla se pone a 0 en los ifs siguientes)
+
+                    // Verificar que la operación y los datos se envían correctamente
+                    if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, act->remitente, strlen(act->remitente) + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
+                    else if (sendMessage(fd_dest, act->texto, strlen(act->texto) + 1) < 0) entrega_ok = 0;
+                    
+                    // Cerrar el socket de entrega
+                    close(fd_dest);
+
+                    if (entrega_ok) {
+                        // Imprimir envío exitoso
+                        printf("s> SEND MESSAGE %u FROM %s TO %s\n", act->id, act->remitente, dest_name);
+
+                        // Bloquear el mutex temporalmente para consultar el estado del remitente
+                        pthread_mutex_lock(&mutex_usuarios);
+                        user_node_t *rem = find_user(head, act->remitente);
+
+                        // Verificar si el remitente existe y sigue conectado
+                        if (rem != NULL && rem->estado == ESTADO_CONECTADO) {
+                            // Copiar datos del remitente para liberar cuanto antes el mutex
+                            char ip_rem[INET_ADDRSTRLEN], puerto_rem[16];
+                            strncpy(ip_rem, rem->ip, INET_ADDRSTRLEN);
+                            strncpy(puerto_rem, rem->puerto, 16);
+                            pthread_mutex_unlock(&mutex_usuarios);
+
+                            // Crear socket para enviar el ACK al remitente
+                            int fd_rem = socket(AF_INET, SOCK_STREAM, 0);
+                            struct sockaddr_in addr_rem;
+                            memset(&addr_rem, 0, sizeof(addr_rem));
+                            addr_rem.sin_family = AF_INET;
+                            addr_rem.sin_port = htons(atoi(puerto_rem));
+                            addr_rem.sin_addr.s_addr = inet_addr(ip_rem);
+
+                            // Conectar y enviar la instrucción SEND_MESS_ACK junto con el ID
+                            if (connect(fd_rem, (struct sockaddr *)&addr_rem, sizeof(addr_rem)) == 0) {
+                                sendMessage(fd_rem, "SEND_MESS_ACK", strlen("SEND_MESS_ACK") + 1);
+                                sendMessage(fd_rem, id_str, strlen(id_str) + 1);
+                                close(fd_rem);
+                            }
+                        } else {
+                            // Liberar el mutex si el remitente está desconectado o no existe
+                            pthread_mutex_unlock(&mutex_usuarios);
+                        }
+
+                        // Liberar la memoria dinámica ocupada por el mensaje entregado
+                        free(act); 
+                    }
+                } else {
+                    // Fallo de conexión: cerrar socket
+                    close(fd_dest);
+                }
+
+                // Manejar los fallos de red producidos por los envíos
+                if (!entrega_ok) {
+                    // Bloquear el mutex para marcar al usuario como desconectado por fallo de red
+                    pthread_mutex_lock(&mutex_usuarios);
+                    user_node_t *u = find_user(head, dest_name);
+                    if (u != NULL) {
+                        // Cambiar estado y limpiar datos de red
+                        u->estado = ESTADO_DESCONECTADO;
+                        memset(u->ip, 0, INET_ADDRSTRLEN);
+                        memset(u->puerto, 0, 16);
+
+                        // Enganchar los mensajes no enviados de vuelta a la cola del usuario
+                        if (u->mensajes == NULL) {
+                            u->mensajes = act;
+                        } else {
+                            // Si por algún motivo ya había mensajes nuevos, colocarlos al final
+                            mensaje_pendiente_t *aux = u->mensajes;
+                            while (aux->next != NULL) aux = aux->next;
+                            aux->next = act;
+                        }
+                    } else {
+                        // Liberar la memoria restante en el caso extremo de que el usuario haya sido borrado
+                        while(act != NULL) {
+                            mensaje_pendiente_t *t = act->next;
+                            free(act);
+                            act = t;
+                        }
+                    }
+                    // Liberar el mutex y cortar el bucle de envíos
+                    pthread_mutex_unlock(&mutex_usuarios);
+                    break;
+                }
+                
+                // Avanzar al siguiente mensaje de la lista
+                act = sig;
+            }
         }
 
     } else if (strcmp(instruccion, "DISCONNECT") == 0){
