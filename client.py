@@ -57,14 +57,14 @@ class client :
                 # Leemos qué instrucción nos está mandando el servidor (o el otro cliente)
                 op = client._read_string(conn)
                 
-                if op == "SEND_MESSAGE":
+                if op == "SEND MESSAGE":
                     remitente = client._read_string(conn)
                     msg_id = client._read_string(conn)
                     mensaje = client._read_string(conn)
                     # El \r evita que se imprima un espacio en blanco no esperado
                     print(f"\rs> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nc> ", end="", flush=True)
                     
-                elif op == "SEND_MESS_ACK":
+                elif op == "SEND MESS ACK":
                     msg_id = client._read_string(conn)
                     print(f"\rc> SEND MESSAGE {msg_id} OK\nc> ", end="", flush=True)
                     
@@ -248,8 +248,11 @@ class client :
                 return client.RC.OK
             else:
                 client._is_connected = False # Abortar hilo
-                if code == 1 or code == 2:
-                    print("c> CONNECT FAIL")
+                if code == 1:
+                    print("c> CONNECT FAIL, USER DOES NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif code == 2:
+                    print("c> USER ALREADY CONNECTED")
                     return client.RC.USER_ERROR
                 else:
                     print("c> CONNECT FAIL")
@@ -268,7 +271,7 @@ class client :
     # * @return USER_ERROR if the user does not exist or if it is already connected
     # * @return ERROR if another error occurred
     @staticmethod
-    def users(user) :
+    def users() :
         
         # Creación del socket TCP
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -281,8 +284,8 @@ class client :
             # Envío de la instrucción USERS
             sock.sendall("USERS\0".encode('utf-8'))
             
-            # Envío del nombre de usuario que hace la petición (Parte 2)
-            sock.sendall(f"{user}\0".encode('utf-8'))
+            # Envío del nombre de usuario que hace la petición
+            sock.sendall(f"{client._current_user}\0".encode('utf-8'))
             
             # Lectura del byte de respuesta
             res = sock.recv(1)
@@ -306,17 +309,8 @@ class client :
                 
                 # Leer los datos de cada usuario
                 for _ in range(num_users):
-                    # En la Parte 2 se lee UNA sola cadena con formato "usuario: IP: puerto"
                     user_info = client._read_string(sock)
-                    print(user_info) # Se imprime tal cual viene
-                    
-                    # Dividir para guardarlo en el diccionario para GETFILE
-                    partes = [p.strip() for p in user_info.split('::')]
-                    if len(partes) >= 3:
-                        uname = partes[0]
-                        u_ip = partes[1]
-                        u_port = partes[2]
-                        client._connected_users[uname] = (u_ip, u_port)
+                    print(user_info)
                     
                 return client.RC.OK
                 
@@ -374,9 +368,11 @@ class client :
                 print("c> DISCONNECT OK")
                 return client.RC.OK
             else:
-                # Error: código 1 (no existe) o 2 (no estaba conectado)
-                if code == 1 or code == 2:
-                    print("c> DISCONNECT FAIL")
+                if code == 1:
+                    print("c> DISCONNECT FAIL, USER DOES NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif code == 2:
+                    print("c> DISCONNECT FAIL, USER NOT CONNECTED")
                     return client.RC.USER_ERROR
                 else:
                     # Código 3 otro error genérico
@@ -439,7 +435,7 @@ class client :
             if code == 0:
                 # En caso de éxito, el servidor devuelve una cadena con el ID asignado
                 msg_id = client._read_string(sock)
-                print(f"c> SEND OK MESSAGE {msg_id}")
+                print(f"c> SEND OK - MESSAGE {msg_id}")
                 return client.RC.OK
                 
             elif code == 1:
@@ -510,10 +506,10 @@ class client :
                             print("Syntax error. Usage: DISCONNECT <userName>")
 
                     elif(line[0]=="USERS") :
-                        if (len(line) == 2) :
-                            client.users(line[1])
+                        if (len(line) == 1) :
+                            client.users()
                         else :
-                            print("Syntax error. Usage: USERS <userName>")
+                            print("Syntax error. Usage: USERS")
 
                     elif(line[0]=="SEND") :
                         if (len(line) >= 3) :

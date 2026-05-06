@@ -56,7 +56,6 @@ void *procesar_peticion(void* socket_especifico_fd){
     uint32_t num_conectados = 0;
     user_node_t *curr;
     char num_str[16]; // Buffer para almacenar el número de usuarios como cadena
-    char info_str[512]; // Búfer para construir la cadena de la Parte 2
 
     // Variables para SEND
 
@@ -263,7 +262,7 @@ void *procesar_peticion(void* socket_especifico_fd){
                     entrega_ok = 1; // Éxito (si falla se pone a 0 en los ifs siguientes)
 
                     // Verificar que la operación y los datos se envían correctamente
-                    if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
+                    if (sendMessage(fd_dest, "SEND MESSAGE", strlen("SEND MESSAGE") + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, act->remitente, strlen(act->remitente) + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, act->texto, strlen(act->texto) + 1) < 0) entrega_ok = 0;
@@ -295,9 +294,9 @@ void *procesar_peticion(void* socket_especifico_fd){
                             addr_rem.sin_port = htons(atoi(puerto_rem));
                             addr_rem.sin_addr.s_addr = inet_addr(ip_rem);
 
-                            // Conectar y enviar la instrucción SEND_MESS_ACK junto con el ID
+                            // Conectar y enviar la instrucción SEND MESS ACK junto con el ID
                             if (connect(fd_rem, (struct sockaddr *)&addr_rem, sizeof(addr_rem)) == 0) {
-                                sendMessage(fd_rem, "SEND_MESS_ACK", strlen("SEND_MESS_ACK") + 1);
+                                sendMessage(fd_rem, "SEND MESS ACK", strlen("SEND MESS ACK") + 1);
                                 sendMessage(fd_rem, id_str, strlen(id_str) + 1);
                                 close(fd_rem);
                             }
@@ -448,14 +447,11 @@ void *procesar_peticion(void* socket_especifico_fd){
                 perror("Error enviando número de usuarios");
             }
 
-            // Enviar los datos de cada usuario conectado
+            // Enviar el nombre de cada usuario conectado
             curr = head;
             while (curr != NULL) {
                 if (curr->estado == ESTADO_CONECTADO) {
-                    // Fusionar en una sola cadena (Parte 2: "usuario:: IP:: puerto")
-                    sprintf(info_str, "%s :: %s :: %s", curr->userName, curr->ip, curr->puerto);
-                    
-                    if (sendMessage(fd_local, info_str, strlen(info_str) + 1) < 0) {
+                    if (sendMessage(fd_local, curr->userName, strlen(curr->userName) + 1) < 0) {
                         perror("Error enviando información de usuario");
                     }
                 }
@@ -573,7 +569,7 @@ void *procesar_peticion(void* socket_especifico_fd){
                 if (connect(fd_dest, (struct sockaddr *)&addr_dest, sizeof(addr_dest)) == 0) {
                     entrega_ok = 1;
                     // Enviar operación, remitente, ID y texto secuencialmente, comprobando fallos
-                    if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
+                    if (sendMessage(fd_dest, "SEND MESSAGE", strlen("SEND MESSAGE") + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, remitente, strlen(remitente) + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                     else if (sendMessage(fd_dest, texto, strlen(texto) + 1) < 0) entrega_ok = 0;
@@ -595,9 +591,9 @@ void *procesar_peticion(void* socket_especifico_fd){
                             addr_rem.sin_port = htons(atoi(puerto_rem));
                             addr_rem.sin_addr.s_addr = inet_addr(ip_rem);
 
-                            // Conectar y enviar la instrucción SEND_MESS_ACK junto con el ID
+                            // Conectar y enviar la instrucción SEND MESS ACK junto con el ID
                             if (connect(fd_rem, (struct sockaddr *)&addr_rem, sizeof(addr_rem)) == 0) {
-                                sendMessage(fd_rem, "SEND_MESS_ACK", strlen("SEND_MESS_ACK") + 1);
+                                sendMessage(fd_rem, "SEND MESS ACK", strlen("SEND MESS ACK") + 1);
                                 sendMessage(fd_rem, id_str, strlen(id_str) + 1);
                                 close(fd_rem);
                             }
