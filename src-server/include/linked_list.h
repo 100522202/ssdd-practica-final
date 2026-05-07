@@ -17,7 +17,8 @@ typedef struct pending_message {
     unsigned int id;              // Identificador numérico del mensaje
     char remitente[MAX_STR_LEN];  // Nombre del usuario que envía el mensaje
     char texto[MAX_STR_LEN];      // Contenido (máx 255 + '\0')
-    // char fichero[MAX_STR_LEN]; // Descomentar en la Parte 2 para SENDATTACH
+    char fichero[MAX_STR_LEN];    // Nombre/ruta del fichero asociado, si lo hay
+    int tiene_adjunto;            // 0 = mensaje normal, 1 = mensaje con adjunto
     
     struct pending_message *next; // Puntero al siguiente mensaje pendiente
 } mensaje_pendiente_t;
