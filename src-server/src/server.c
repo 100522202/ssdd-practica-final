@@ -34,11 +34,7 @@ void handle_sigint(int sig) {
     exit(0);
 }
 
-
-// =====================================================================
 // Dispatcher principal de peticiones (función del hilo).
-// =====================================================================
-
 
 // Función para procesar las peticiones de los hilos.
 void *procesar_peticion(void* socket_especifico_fd){
