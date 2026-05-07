@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 
-// Funciones auxiliares para leer/enviar
+// Funciones auxiliares para leer/enviar.
 int readLine(int fd, char *buffer, size_t n);
 int sendMessage(int socket, char *buffer, int len);
 

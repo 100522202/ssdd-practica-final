@@ -1,4 +1,4 @@
-# Makefile global por si luego hay que meter más Makefiles aparte del de server
+# Makefile global por si luego hay que meter más Makefiles aparte del de server.
 
 all:
 	$(MAKE) -C src-server

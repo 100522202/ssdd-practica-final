@@ -5,11 +5,11 @@ from wsgiref.simple_server import make_server
 import argparse
 
 
-# Clase que define el servicio web SOAP
+# Clase que define el servicio web SOAP.
 class Normalizador(ServiceBase):
 
-    # Se crea este método como operación remota del servicio web
-    # Va a recibir una cadena Unicode y devuelve otra en el mismo formato
+    # Se crea este método como operación remota del servicio web.
+    # Va a recibir una cadena Unicode y devuelve otra en el mismo formato.
     @rpc(Unicode, _returns=Unicode)
     def normalizar(ctx, mensaje):
         # Se separa el mensaje en palabras, eliminando espacios repetidos.
@@ -21,7 +21,7 @@ class Normalizador(ServiceBase):
         # Se devuelve el mensaje ya normalizado al cliente SOAP.
         return mensaje_normalizado
     
-# Se crea la aplicación SOAP con el servicio Normalizador
+# Se crea la aplicación SOAP con el servicio Normalizador.
 application = Application(
     # Se indica qué servicios ofrece esta aplicación.
     services=[Normalizador],
