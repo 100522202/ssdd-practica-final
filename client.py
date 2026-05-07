@@ -156,15 +156,23 @@ class client :
                     fichero = client._read_string(conn)
 
                     try:
-                        # Se abre el fichero solicitado en modo binario.
+                        import os
+                        # Se comprueba que el fichero exista y se saca su tamaño para mandarlo por red.
+                        # Así evitamos cargar todo en RAM.
+                        tamaño = os.path.getsize(fichero)
+
+                        # Se envía primero el tamaño total del fichero como cadena terminada en '\0'.
+                        conn.sendall(f"{tamaño}\0".encode("utf-8"))
+
+                        # MODO STREAMING (Lectura por bloques)
+                        # Leemos secuencialmente los datos del disco duro en chunks de 4096 bytes
+                        # y los inyectamos al socket de red para no sobrecargar la RAM del sistema.
                         with open(fichero, "rb") as f:
-                            contenido = f.read()
-
-                        # Se envía primero el tamaño del fichero como cadena terminada en '\0'.
-                        conn.sendall(f"{len(contenido)}\0".encode("utf-8"))
-
-                        # Se envía después el contenido real del fichero.
-                        conn.sendall(contenido)
+                            while True:
+                                chunk = f.read(4096)
+                                if not chunk: # EOF (Fin del archivo)
+                                    break
+                                conn.sendall(chunk)
 
                     except OSError:
                         # Se envía -1 si el fichero no existe o no se puede abrir.
@@ -703,17 +711,29 @@ class client :
             # Se convierte el tamaño recibido a entero.
             size = int(size_str)
 
-            # Se reciben exactamente los bytes que forman el fichero.
-            contenido = client._recibir_bytes(sock, size)
+            # Se reciben exactamente los bytes que forman el fichero y se guardan
+            # leyendo y escribiendo iterativamente sin cargar un buffer unificado temporal.
+            bytes_pendientes = size
 
-            # Se comprueba que el fichero se haya recibido completo.
-            if contenido is None:
-                print("c> FILE TRANSFER FAILED")
-                return client.RC.ERROR
-            
-            # Se guarda el contenido recibido en el fichero local indicado.
             with open(local_file, "wb") as f:
-                f.write(contenido)
+                while bytes_pendientes > 0:
+                    # En cada iteración leemos como máximo 4KB del socket
+                    chunk = sock.recv(min(4096, bytes_pendientes))
+                    if not chunk:
+                        # Si devuelve nada es que han cortado la conexión (error inexperado)
+                        break
+                    # Guardamos el bloque al disco reduciendo lo pendiente
+                    f.write(chunk)
+                    bytes_pendientes -= len(chunk)
+
+            # Se comprueba que no falten bytes (cortes).
+            if bytes_pendientes != 0:
+                print("c> FILE TRANSFER FAILED")
+                # Si falló limpiamos el archivo incompleto para ser rigurosos
+                import os
+                if os.path.exists(local_file):
+                    os.remove(local_file)
+                return client.RC.ERROR
 
             print("c> FILE TRANSFER OK")
             
