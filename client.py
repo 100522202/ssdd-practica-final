@@ -31,6 +31,7 @@ class client :
 
     # Cliente SOAP reutilizable para no cargar el WSDL en cada mensaje.
     _soap_client = None
+    _wsdl_url = "http://127.0.0.1:8000/?wsdl"
 
     # ******************** METHODS *******************.
 
@@ -70,12 +71,9 @@ class client :
     @staticmethod
     def _normalizar_mensaje(message):
         try:
-            # Se indica la URL del WSDL del servicio web.
-            wsdl_url = "http://127.0.0.1:8000/?wsdl"
-
             # Se crea el cliente SOAP usando el WSDL solo la primera vez.
             if client._soap_client is None:
-                client._soap_client = zeep.Client(wsdl=wsdl_url)
+                client._soap_client = zeep.Client(wsdl=client._wsdl_url)
 
             # Se llama a la operación remota normalizar().
             mensaje_normalizado = client._soap_client.service.normalizar(message)
@@ -125,30 +123,30 @@ class client :
                 # Leemos qué instrucción nos está mandando el servidor (o el otro cliente).
                 op = client._read_string(conn)
                 
-                if op == "SEND MESSAGE":
+                if op == "SEND_MESSAGE":
                     remitente = client._read_string(conn)
                     msg_id = client._read_string(conn)
                     mensaje = client._read_string(conn)
                     # El \r evita que se imprima un espacio en blanco no esperado.
                     print(f"\rc> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nc> ", end="", flush=True)
                     
-                elif op == "SEND MESS ACK":
+                elif op == "SEND_MESS_ACK":
                     msg_id = client._read_string(conn)
                     print(f"\rc> SEND MESSAGE {msg_id} OK\nc> ", end="", flush=True)
                     
-                elif op == "SEND MESSAGE ATTACH":
+                elif op == "SEND_MESSAGE_ATTACH":
                     remitente = client._read_string(conn)
                     msg_id = client._read_string(conn)
                     mensaje = client._read_string(conn)
                     fichero = client._read_string(conn)
                     print(f"\rc> MESSAGE {msg_id} FROM {remitente}\n{mensaje}\nEND\nFILE {fichero}\nc> ", end="", flush=True)
                     
-                elif op == "SEND MESS ATTACH ACK":
+                elif op == "SEND_MESS_ATTACH_ACK":
                     msg_id = client._read_string(conn)
                     fichero = client._read_string(conn)
                     print(f"\rc> SENDATTACH MESSAGE {msg_id} {fichero} OK\nc> ", end="", flush=True)
 
-                elif op == "GET FILE":
+                elif op == "GET_FILE":
                     # Se lee el usuario que solicita el fichero.
                     solicitante = client._read_string(conn)
 
@@ -692,7 +690,7 @@ class client :
             sock.connect((ip_remota, int(puerto_remoto)))
 
             # Se envía la operación de petición del fichero.
-            sock.sendall("GET FILE\0".encode('utf-8'))
+            sock.sendall("GET_FILE\0".encode('utf-8'))
 
             # Se envía el usuario que solicita el fichero.
             sock.sendall(f"{client._current_user}\0".encode('utf-8'))
@@ -837,7 +835,7 @@ class client :
     # * @brief Prints program usage.
     @staticmethod
     def usage() :
-        print("Usage: python3 client.py -s <server> -p <port>")
+        print("Usage: python3 client.py -s <server> -p <port> [--wsdl-url <url>]")
 
 
     # *
@@ -847,6 +845,8 @@ class client :
         parser = argparse.ArgumentParser()
         parser.add_argument('-s', type=str, required=True, help='Server IP')
         parser.add_argument('-p', type=int, required=True, help='Server Port')
+        parser.add_argument('--wsdl-url', type=str, default="http://127.0.0.1:8000/?wsdl",
+                            help='SOAP WSDL URL for message normalizer')
         args = parser.parse_args()
 
         if (args.s is None):
@@ -860,6 +860,7 @@ class client :
         
         client._server = args.s
         client._port = args.p
+        client._wsdl_url = args.wsdl_url
 
         return True
 

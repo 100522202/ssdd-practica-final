@@ -20,8 +20,8 @@
 // Funciones auxiliares compartidas.
 /*
  * enviar_ack_remitente: Envía un ACK al remitente de un mensaje.
- * Si tiene_adjunto es 1, envía "SEND MESS ATTACH ACK" + id + fichero.
- * Si tiene_adjunto es 0, envía "SEND MESS ACK" + id.
+ * Si tiene_adjunto es 1, envía "SEND_MESS_ATTACH_ACK" + id + fichero.
+ * Si tiene_adjunto es 0, envía "SEND_MESS_ACK" + id.
  *
  * - ip_rem: IP del remitente.
  * - puerto_rem: Puerto del remitente.
@@ -46,11 +46,11 @@ void enviar_ack_remitente(const char *ip_rem, const char *puerto_rem,
     // Conectar y enviar la instrucción de ACK junto con el ID.
     if (connect(fd_rem, (struct sockaddr *)&addr_rem, sizeof(addr_rem)) == 0) {
         if (tiene_adjunto) {
-            sendMessage(fd_rem, "SEND MESS ATTACH ACK", strlen("SEND MESS ATTACH ACK") + 1);
+            sendMessage(fd_rem, "SEND_MESS_ATTACH_ACK", strlen("SEND_MESS_ATTACH_ACK") + 1);
             sendMessage(fd_rem, (char *)id_str, strlen(id_str) + 1);
             sendMessage(fd_rem, (char *)fichero, strlen(fichero) + 1);
         } else {
-            sendMessage(fd_rem, "SEND MESS ACK", strlen("SEND MESS ACK") + 1);
+            sendMessage(fd_rem, "SEND_MESS_ACK", strlen("SEND_MESS_ACK") + 1);
             sendMessage(fd_rem, (char *)id_str, strlen(id_str) + 1);
         }
     }
@@ -163,13 +163,13 @@ void entregar_pendientes(mensaje_pendiente_t *mensajes_a_enviar,
 
             // Verificar que la operación y los datos se envían correctamente.
             if (act->tiene_adjunto) {
-                if (sendMessage(fd_dest, "SEND MESSAGE ATTACH", strlen("SEND MESSAGE ATTACH") + 1) < 0) entrega_ok = 0;
+                if (sendMessage(fd_dest, "SEND_MESSAGE_ATTACH", strlen("SEND_MESSAGE_ATTACH") + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, act->remitente, strlen(act->remitente) + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, act->texto, strlen(act->texto) + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, act->fichero, strlen(act->fichero) + 1) < 0) entrega_ok = 0;
             } else {
-                if (sendMessage(fd_dest, "SEND MESSAGE", strlen("SEND MESSAGE") + 1) < 0) entrega_ok = 0;
+                if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, act->remitente, strlen(act->remitente) + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                 else if (sendMessage(fd_dest, act->texto, strlen(act->texto) + 1) < 0) entrega_ok = 0;
@@ -771,14 +771,14 @@ static void procesar_envio_comun(int fd_local, pthread_mutex_t *mutex, user_node
                     entrega_ok = 1;
                     if (tiene_adjunto) {
                         // Enviar campos estructurados para un mensaje con fichero adjunto.
-                        if (sendMessage(fd_dest, "SEND MESSAGE ATTACH", strlen("SEND MESSAGE ATTACH") + 1) < 0) entrega_ok = 0;
+                        if (sendMessage(fd_dest, "SEND_MESSAGE_ATTACH", strlen("SEND_MESSAGE_ATTACH") + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, remitente, strlen(remitente) + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, texto, strlen(texto) + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, fichero, strlen(fichero) + 1) < 0) entrega_ok = 0;
                     } else {
                         // Enviar campos estructurados para un mensaje de texto normal.
-                        if (sendMessage(fd_dest, "SEND MESSAGE", strlen("SEND MESSAGE") + 1) < 0) entrega_ok = 0;
+                        if (sendMessage(fd_dest, "SEND_MESSAGE", strlen("SEND_MESSAGE") + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, remitente, strlen(remitente) + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, id_str, strlen(id_str) + 1) < 0) entrega_ok = 0;
                         else if (sendMessage(fd_dest, texto, strlen(texto) + 1) < 0) entrega_ok = 0;
