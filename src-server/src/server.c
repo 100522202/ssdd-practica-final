@@ -242,17 +242,26 @@ int main(int argc, char * argv[]){
         }
         *socket_hilo_fd = socket_especifico_fd;
 
+
+        // -- Crear hilo DETACHED --
+
+        // Variables para el hilo y sus atributos
         pthread_t id_hilo;
         pthread_attr_t attr_hilo;
 
+        // Inicializar atributos
         pthread_attr_init(&attr_hilo);
         pthread_attr_setdetachstate(&attr_hilo, PTHREAD_CREATE_DETACHED);
 
+        // Crear el hilo
         if (pthread_create(&id_hilo, &attr_hilo, procesar_peticion, (void *)socket_hilo_fd) != 0) {
+            // Error creando el hilo
             perror("pthread_create");
             close(socket_especifico_fd);
             free(socket_hilo_fd);
         }
+
+        // Eliminar la variable de los atributos del hilo
         pthread_attr_destroy(&attr_hilo);
     }
 
