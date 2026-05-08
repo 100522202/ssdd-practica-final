@@ -1,6 +1,7 @@
-# ssdd-pfinal
+# SSDD - Servicio de envío de mensajes
 
 Proyecto de Sistemas Distribuidos con:
+
 - Servidor principal en C (`server`)
 - Servidor RPC en C (`log_rpc_server`)
 - Servicio web SOAP en Python (`servicio_web.py`)
@@ -33,6 +34,7 @@ make
 ```
 
 Esto genera en la raíz:
+
 - `./server`
 - `./log_rpc_server`
 
@@ -106,4 +108,3 @@ QUIT
 ```bash
 zip -r ssdd_proyecto_A_B.zip .
 ```
-
