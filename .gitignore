@@ -3,3 +3,4 @@ build
 server
 log_rpc_server
 .venv
+__pycache__
