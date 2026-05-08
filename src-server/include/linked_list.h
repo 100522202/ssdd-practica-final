@@ -47,9 +47,48 @@ typedef struct user_node {
 
 /* --- Prototipos de funciones para gestionar la lista ---. */
 
-user_node_t* add_user(user_node_t **head, const char *userName); // Const char porque solo leeremos, no modificaremos userName.
+/**
+ * @brief Añade un nuevo usuario a la lista de usuarios registrados.
+ * 
+ * Reserva memoria para un nuevo nodo, inicializa sus campos (estado desconectado,
+ * sin mensajes pendientes, contador de mensajes a cero) e inserta el nodo
+ * al principio de la lista.
+ * 
+ * @param head Puntero al puntero del primer elemento de la lista.
+ * @param userName Nombre del usuario a registrar. Const char porque solo leeremos, no modificaremos userName.
+ * @return user_node_t* Puntero al nuevo nodo creado, o NULL en caso de error de memoria.
+ */
+user_node_t* add_user(user_node_t **head, const char *userName);
+
+/**
+ * @brief Elimina un usuario de la lista y libera su memoria.
+ * 
+ * Busca al usuario por su nombre. Si lo encuentra, desvincula el nodo de la lista,
+ * libera todos sus mensajes pendientes almacenados y finalmente libera la memoria del nodo.
+ * 
+ * @param head Puntero al puntero del primer elemento de la lista.
+ * @param userName Nombre del usuario a eliminar.
+ * @return int 0 si se eliminó correctamente, -1 si el usuario no existe.
+ */
 int remove_user(user_node_t **head, const char *userName);
+
+/**
+ * @brief Busca un usuario en la lista por su nombre.
+ * 
+ * @param head Puntero al primer elemento de la lista.
+ * @param userName Nombre del usuario a buscar.
+ * @return user_node_t* Puntero al nodo del usuario si se encuentra, NULL en caso contrario.
+ */
 user_node_t* find_user(user_node_t *head, const char *userName);
+
+/**
+ * @brief Libera la memoria de toda la lista de usuarios.
+ * 
+ * Recorre la lista completa liberando para cada usuario tanto sus mensajes
+ * pendientes como el propio nodo del usuario.
+ * 
+ * @param head Puntero al primer elemento de la lista.
+ */
 void free_user_list(user_node_t *head);
 
 #endif
