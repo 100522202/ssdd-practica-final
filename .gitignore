@@ -4,3 +4,5 @@ server
 log_rpc_server
 .venv
 __pycache__
+*.png
+pruebas_adicionales.md
