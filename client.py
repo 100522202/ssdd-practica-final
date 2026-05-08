@@ -320,7 +320,7 @@ class client :
         try:
             # Crear el socket de escucha para este cliente.
             client._listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client._listen_sock.bind(('', 0))
+            client._listen_sock.bind(('', 0)) # Puerto asignado por el SO
             client._listen_sock.listen(5) # Ponemos el socket en modo escucha: máximo 5 conexiones pendientes.
             
             puerto_asignado = client._listen_sock.getsockname()[1]
