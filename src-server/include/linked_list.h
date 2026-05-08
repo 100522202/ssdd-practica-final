@@ -52,9 +52,4 @@ int remove_user(user_node_t **head, const char *userName);
 user_node_t* find_user(user_node_t *head, const char *userName);
 void free_user_list(user_node_t *head);
 
-// TODO: REFACTORIZAR TODO EL CÓDIGO, por ejemplo estas funciones no las hemos implementado.
-// Las hemos hecho directamente dentro del connect nuevo.
-// void add_pending_message(user_node_t *dest_user, const char *sender, unsigned int id, const char *text);.
-
-
 #endif
