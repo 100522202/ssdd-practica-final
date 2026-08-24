@@ -1,110 +1,47 @@
-# SSDD - Servicio de envío de mensajes
+# Sistema Distribuido Híbrido de Mensajería y Auditoría - Sistemas Distribuidos (SSDD)
 
-Proyecto de Sistemas Distribuidos con:
+Práctica Final de la asignatura **Sistemas Distribuidos (UC3M)**.
 
-- Servidor principal en C (`server`)
-- Servidor RPC en C (`log_rpc_server`)
-- Servicio web SOAP en Python (`servicio_web.py`)
-- Cliente en Python (`client.py`)
+---
 
-## 1) Requisitos del sistema (Linux)
+## 📌 Arquitectura del Sistema
 
-Instala dependencias de compilación, RPC/TIRPC y utilidades:
+Sistema distribuido multi-servicio que integra varios paradigmas de comunicación:
 
-```bash
-sudo apt update
-sudo apt install -y build-essential make gcc rpcsvc-proto libtirpc-dev python3 python3-venv python3-pip zip unzip
+```
++------------------+         Sockets TCP        +----------------------+
+|  Cliente Python  | <========================> | Servidor Central (C) |
+|   (client.py)    |                            |    (Multithread)     |
++------------------+                            +----------------------+
+        |                                                  |
+        | SOAP (WSDL)                                      | ONC RPC
+        v                                                  v
++------------------+                            +----------------------+
+|  Servicio Web    |                            | Servidor de Logs     |
+| (servicio_web.py)|                            |      (RPC en C)      |
++------------------+                            +----------------------+
 ```
 
-## 2) Entorno Python
+### 🧩 Componentes:
+1. **Servidor Central (C / Sockets TCP + Pthreads):** Gestión de usuarios (registro, conexión, desconexión), buzón de mensajes pendientes y entrega de mensajes en tiempo real.
+2. **Servidor de Logs / Auditoría (C / ONC RPC):** Registro distribuido de operaciones mediante llamadas RPC.
+3. **Servicio Web Administrativo (Python / SOAP):** Servicio web basado en protocolo SOAP (`spyne`) para operaciones de consulta.
+4. **Cliente Interactivo (Python):** Interfaz CLI con hilo de escucha asíncrono para recepción de mensajes en segundo plano.
 
-Desde la raíz del proyecto:
+---
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-## 3) Compilación (desde la raíz)
+## 🚀 Despliegue y Ejecución
 
 ```bash
+# 1. Compilar los módulos en C (Servidor central y RPC)
 make
-```
 
-Esto genera en la raíz:
+# 2. Iniciar el servicio web SOAP
+python servicio_web.py -p 8000
 
-- `./server`
-- `./log_rpc_server`
+# 3. Iniciar el servidor central
+./src-server/server -p 9000
 
-Limpieza:
-
-```bash
-make clean
-```
-
-## 4) Ejecución (orden recomendado)
-
-Abre 4 terminales en la raíz del proyecto.
-
-### Terminal 1: servicio web SOAP
-
-```bash
-source .venv/bin/activate
-python3 servicio_web.py -p 8000
-```
-
-### Terminal 2: servidor RPC
-
-```bash
-./log_rpc_server
-```
-
-### Terminal 3: servidor principal
-
-```bash
-export LOG_RPC_IP=127.0.0.1
-./server -p 12345
-```
-
-### Terminal 4 (y más): clientes
-
-```bash
-source .venv/bin/activate
-python3 client.py -s 127.0.0.1 -p 12345 --wsdl-url http://127.0.0.1:8000/?wsdl
-```
-
-Para abrir otro cliente, repite el mismo comando en otra terminal.
-
-## 5) Comandos del cliente
-
-```text
-REGISTER <userName>
-UNREGISTER <userName>
-CONNECT <userName>
-DISCONNECT <userName>
-USERS
-SEND <userName> <message>
-SENDATTACH <userName> <message> <fileName>
-GETFILE <userName> <fileName> <localFileName>
-QUIT
-```
-
-## 6) Prueba rápida mínima
-
-1. En cliente A:
-   - `REGISTER ana`
-   - `CONNECT ana`
-2. En cliente B:
-   - `REGISTER bob`
-   - `CONNECT bob`
-3. En cliente A:
-   - `SEND bob hola    mundo`
-4. En cliente B verás el mensaje normalizado por el servicio web.
-
-## 7) Empaquetado zip de entrega (ejemplo)
-
-```bash
-zip -r ssdd_proyecto_A_B.zip .
+# 4. Iniciar clientes
+python client.py -s 127.0.0.1 -p 9000
 ```
